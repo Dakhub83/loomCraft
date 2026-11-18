@@ -32,12 +32,13 @@ The key is read by a small proxy inside the Vite dev/preview server (`server/cla
   - Pick layers, and choose which view each top-level group goes to. Groups named Front, Back, Sleeve and so on are matched automatically, and hidden and background or mockup layers start unchecked.
   - Choose the placement: the canvas is the print area, fit the artwork to the print area, or actual size from the file's ppi.
   - Text layers stay editable when their font is on Google Fonts. Otherwise, or with **Merge into one image per view**, they come in as pixels.
-- **360° preview** (the **360° View** button on the stage): the garment is shown in 3D with your artwork on it.
-  - Drag to rotate all the way around, scroll to zoom, and press Space to auto-spin.
-  - Jump to Front, Side, Back or Inside.
-  - The **Interior** slider cuts away the half facing you to show the inside of the garment: the reverse of the fabric, ink bleed-through and the neck label.
-  - **Snapshot** saves the current angle as a PNG.
-  - The preview updates live when you change the garment color.
+- **360° preview** (the **360° View** button on the stage):
+  - **3D model:** every built-in garment is a 3D model worn on a mannequin, with collars, cuffs, rib bands, hoods, pockets, zippers, snaps, buttons and drawcords. Your artwork from every view (front, back, sleeve, legs) is projected onto it at its true print size.
+  - **Flat-lay:** a mode that is exact to the 2D drawing. It's the only mode for custom photo blanks.
+  - **Fabric looks:** heavyweight or regular jersey, piqué, brushed fleece, French terry, rib knit, nylon, twill, denim, canvas and athletic mesh, each with real weave texture and sheen. The choice is saved with the design and feeds the manufacturing spec.
+  - **Controls:** drag to rotate all the way around, scroll to zoom, press Space to auto-spin, and jump to Front, Side, Back or Inside. The mannequin can be hidden for a ghost view.
+  - **Interior:** the slider cuts away the near half to show the inside, with the reverse of the fabric and the neck label.
+  - **Snapshot:** saves the current angle as a PNG.
 - **Custom garments**: upload your own front/back flat-lay photos, drag the print area into place, set its real width in inches, and tint the photo with multiply or overlay blending.
 - **Design canvas**: a Fabric.js canvas sits over the safe print zone. It supports drag, corner-scale and rotate, snaps to the center with guides, and has layer ordering, lock/hide, and undo/redo per view.
 - **Assistant drawer** (the Assistant button): a slide-over with three local helpers that need no API key:

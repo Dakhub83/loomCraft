@@ -1,4 +1,5 @@
 import { garmentViews, getGarment } from '../data/garments';
+import type { FabricDef } from '../data/fabrics';
 import type { GarmentId, ManufacturingSpec, PrintEffect, ViewDesigns, ViewEffects } from '../types';
 import { effectFor, hasArtwork } from '../types';
 import { isDark } from './color';
@@ -19,7 +20,7 @@ interface FabricProfile {
   trims: string[];
   care: string;
   /** Fiber family – drives print-method compatibility warnings. */
-  fiber: 'cotton' | 'cotton-blend' | 'nylon' | 'acrylic' | 'canvas';
+  fiber: 'cotton' | 'cotton-blend' | 'nylon' | 'acrylic' | 'canvas' | 'polyester';
   embroideryFirst?: boolean;
 }
 
@@ -151,14 +152,22 @@ function methodNotes(method: PrintEffect, darkGarment: boolean, profile: FabricP
       notes.push('Cure 160 °C (320 °F) 2–3 min; enzyme or garment wash after print for worn-in look.');
       break;
   }
+  if (profile.fiber === 'polyester' && method !== 'none')
+    notes.push('⚠ Polyester: use low-bleed (dye-blocker) ink and a low-cure plastisol (~150 °C) to prevent dye migration.');
   if (profile.fiber === 'nylon' && method !== 'none') notes.push('⚠ Nylon shell: add nylon bonding agent / catalyst to plastisol and run a pre-production wash test.');
   return notes;
 }
 
-/** Builds a fresh spec for a garment from its print methods and artwork. */
-export function generateSpec(garment: GarmentId, color: string, designs: ViewDesigns, effects: ViewEffects): ManufacturingSpec {
+/**
+ * Builds a fresh spec for a garment from its print methods and artwork. `fabric` is an explicit fabric
+ * choice (from the 360° view); it replaces the garment profile's weight, composition, fiber and care.
+ */
+export function generateSpec(garment: GarmentId, color: string, designs: ViewDesigns, effects: ViewEffects, fabric?: FabricDef): ManufacturingSpec {
   const def = getGarment(garment);
-  const profile = PROFILES[garment] ?? CATEGORY_FALLBACK[def.category] ?? CATEGORY_FALLBACK.custom;
+  const base = PROFILES[garment] ?? CATEGORY_FALLBACK[def.category] ?? CATEGORY_FALLBACK.custom;
+  const profile: FabricProfile = fabric
+    ? { ...base, gsm: fabric.gsm, weightNote: fabric.weightNote, composition: fabric.composition, fiber: fabric.fiber, care: fabric.care }
+    : base;
   const dark = isDark(color);
   const oz = profile.gsm ? (profile.gsm / 33.906).toFixed(1) : null;
 

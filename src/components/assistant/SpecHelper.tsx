@@ -3,6 +3,7 @@ import { AlertTriangle, FileText, RefreshCw, Ruler, Trash2 } from 'lucide-react'
 import type { GarmentId, ManufacturingSpec, ViewDesigns, ViewEffects } from '../../types';
 import { getGarment } from '../../data/garments';
 import { generateSpec, specIsStale } from '../../utils/manufacturingSpecs';
+import { getFabric } from '../../data/fabrics';
 
 interface Props {
   garment: GarmentId;
@@ -10,6 +11,8 @@ interface Props {
   designs: ViewDesigns;
   effects: ViewEffects;
   spec: ManufacturingSpec | undefined;
+  /** Explicit fabric choice for this garment (from the 360° view), if any. */
+  fabricId?: string;
   onChange(spec: ManufacturingSpec | null): void;
   onOpenSizeChart(): void;
   onInfo(msg: string): void;
@@ -25,12 +28,12 @@ const FIELDS: Array<{ key: TextField; label: string; rows?: number }> = [
   { key: 'care', label: 'Care instructions', rows: 2 },
 ];
 
-export const SpecHelper = memo(function SpecHelper({ garment, color, designs, effects, spec, onChange, onOpenSizeChart, onInfo }: Props) {
+export const SpecHelper = memo(function SpecHelper({ garment, color, designs, effects, spec, fabricId, onChange, onOpenSizeChart, onInfo }: Props) {
   const g = getGarment(garment);
   const stale = spec ? specIsStale(spec, garment, designs, effects) : false;
 
   const generate = () => {
-    onChange(generateSpec(garment, color, designs, effects));
+    onChange(generateSpec(garment, color, designs, effects, getFabric(fabricId)));
     onInfo(`${spec ? 'Regenerated' : 'Generated'} the manufacturing spec for the ${g.name}`);
   };
 
@@ -44,6 +47,12 @@ export const SpecHelper = memo(function SpecHelper({ garment, color, designs, ef
       <button onClick={generate} className="lc-btn-primary h-9 w-full gap-2 text-xs">
         <RefreshCw size={14} /> {spec ? 'Regenerate from current design' : 'Generate manufacturing spec'}
       </button>
+
+      {getFabric(fabricId) && (
+        <p className="rounded-lg bg-violet-500/10 px-2.5 py-2 text-[11px] text-violet-200">
+          Fabric chosen in the 360° view: <strong>{getFabric(fabricId)!.name}</strong>. Generating uses its weight, composition and care.
+        </p>
+      )}
 
       {stale && (
         <p className="flex items-start gap-1.5 rounded-lg bg-amber-500/10 px-2.5 py-2 text-[11px] text-amber-200">

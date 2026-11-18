@@ -97,6 +97,9 @@ export interface ManufacturingSpec {
 
 export type ManufacturingSpecs = Partial<Record<GarmentId, ManufacturingSpec>>;
 
+/** Explicit fabric choice per garment (fabric id from `data/fabrics.ts`); absent = the garment's default. */
+export type FabricChoices = Partial<Record<GarmentId, string>>;
+
 export interface Draft {
   id: string;
   name: string;
@@ -106,6 +109,7 @@ export interface Draft {
   effects: ViewEffects;
   sizeCharts?: SizeCharts;
   mfgSpecs?: ManufacturingSpecs;
+  fabrics?: FabricChoices;
   thumbnail?: string;
   createdAt: number;
   updatedAt: number;
@@ -120,6 +124,7 @@ export interface Workspace {
   effects: ViewEffects;
   sizeCharts?: SizeCharts;
   mfgSpecs?: ManufacturingSpecs;
+  fabrics?: FabricChoices;
 }
 
 export const emptyDesigns = (): ViewDesigns => ({});

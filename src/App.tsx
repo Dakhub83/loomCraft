@@ -17,7 +17,7 @@ import { DesignCanvas, type DesignCanvasHandle, type HistoryState } from './comp
 import { GarmentSVG } from './components/GarmentTemplates';
 import { CustomGarmentEditor } from './components/CustomGarmentEditor';
 import { DEFAULT_GARMENT, GARMENT_H, GARMENT_W, garmentViews, getGarment, getZone, hasGarment, hasView, setCustomGarments, viewLabel } from './data/garments';
-import type { CanvasJSON, CustomGarmentRecord, Draft, GarmentId, LayerInfo, ManufacturingSpec, ManufacturingSpecs, PrintEffect, SelectionInfo, SizeChart, SizeCharts, ViewId, Workspace } from './types';
+import type { CanvasJSON, CustomGarmentRecord, Draft, FabricChoices, GarmentId, LayerInfo, ManufacturingSpec, ManufacturingSpecs, PrintEffect, SelectionInfo, SizeChart, SizeCharts, ViewId, Workspace } from './types';
 import { defaultEffects, effectFor, emptyDesigns, hasArtwork } from './types';
 import { isDark } from './utils/color';
 import { effectName, filterMarkup } from './utils/printEffects';
@@ -88,6 +88,7 @@ function Studio({ initial, initialCustoms }: { initial: Workspace | null; initia
   const [customEditor, setCustomEditor] = useState<{ open: boolean; editing: CustomGarmentRecord | null }>({ open: false, editing: null });
   const [sizeCharts, setSizeCharts] = useState<SizeCharts>(initial?.sizeCharts ?? {});
   const [mfgSpecs, setMfgSpecs] = useState<ManufacturingSpecs>(initial?.mfgSpecs ?? {});
+  const [fabrics, setFabrics] = useState<FabricChoices>(initial?.fabrics ?? {});
   const [sizeChartOpen, setSizeChartOpen] = useState(false);
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [show360, setShow360] = useState(false);
@@ -116,7 +117,7 @@ function Studio({ initial, initialCustoms }: { initial: Workspace | null; initia
   const pendingPlacement = useRef<PlacementPreset | null>(null);
   const canvasWaiters = useRef<Array<() => void>>([]);
 
-  const state = { name, draftId, garment, color, view, designs, effects, sizeCharts, mfgSpecs };
+  const state = { name, draftId, garment, color, view, designs, effects, sizeCharts, mfgSpecs, fabrics };
   const stateRef = useRef(state);
   stateRef.current = state;
 
@@ -151,9 +152,9 @@ function Studio({ initial, initialCustoms }: { initial: Workspace | null; initia
 
   /* ---------------- autosave workspace (IndexedDB, off the input path) ---------------- */
   useEffect(() => {
-    const t = setTimeout(() => void saveWorkspace({ draftId, name, garment, color, designs, effects, sizeCharts, mfgSpecs }), 600);
+    const t = setTimeout(() => void saveWorkspace({ draftId, name, garment, color, designs, effects, sizeCharts, mfgSpecs, fabrics }), 600);
     return () => clearTimeout(t);
-  }, [draftId, name, garment, color, designs, effects, sizeCharts, mfgSpecs]);
+  }, [draftId, name, garment, color, designs, effects, sizeCharts, mfgSpecs, fabrics]);
 
   /* ---------------- stage fit ---------------- */
   useEffect(() => {
@@ -292,6 +293,19 @@ function Studio({ initial, initialCustoms }: { initial: Workspace | null; initia
     },
     [garment],
   );
+  /** Fabric choice for the current garment (null = back to the garment's default). */
+  const changeFabric = useCallback(
+    (id: string | null) => {
+      setFabrics((all) => {
+        const next = { ...all };
+        if (id) next[garment] = id;
+        else delete next[garment];
+        return next;
+      });
+      setDirty(true);
+    },
+    [garment],
+  );
 
   /* ---------------- Claude design assistant ---------------- */
   /** Resolves when the next canvas (after a garment/view switch) has mounted and loaded its design. */
@@ -359,6 +373,7 @@ function Studio({ initial, initialCustoms }: { initial: Workspace | null; initia
           effects: s.effects,
           sizeCharts: s.sizeCharts,
           mfgSpecs: s.mfgSpecs,
+          fabrics: s.fabrics,
           thumbnail,
           createdAt: existing?.createdAt ?? now,
           updatedAt: now,
@@ -390,6 +405,7 @@ function Studio({ initial, initialCustoms }: { initial: Workspace | null; initia
     setEffects({ ...defaultEffects(), ...d.effects });
     setSizeCharts(d.sizeCharts ?? {});
     setMfgSpecs(d.mfgSpecs ?? {});
+    setFabrics(d.fabrics ?? {});
     setView(firstView(g));
     setDirty(false);
     setSavedAt(d.updatedAt);
@@ -406,6 +422,7 @@ function Studio({ initial, initialCustoms }: { initial: Workspace | null; initia
     setEffects(defaultEffects());
     setSizeCharts({});
     setMfgSpecs({});
+    setFabrics({});
     setView(firstView(garment));
     setDirty(false);
     setSavedAt(null);
@@ -580,7 +597,17 @@ function Studio({ initial, initialCustoms }: { initial: Workspace | null; initia
                   </div>
                 }
               >
-                <Garment360 name={name} garment={garment} color={color} designs={designs} effects={effects} onClose={close360} onError={onError} />
+                <Garment360
+                  name={name}
+                  garment={garment}
+                  color={color}
+                  designs={designs}
+                  effects={effects}
+                  fabricId={fabrics[garment]}
+                  onFabric={changeFabric}
+                  onClose={close360}
+                  onError={onError}
+                />
               </Suspense>
             )}
           </div>
@@ -641,6 +668,7 @@ function Studio({ initial, initialCustoms }: { initial: Workspace | null; initia
                   designs={designs}
                   effects={effects}
                   spec={mfgSpecs[garment]}
+                  fabricId={fabrics[garment]}
                   onChange={updateSpec}
                   onOpenSizeChart={() => setSizeChartOpen(true)}
                   onInfo={onInfo}

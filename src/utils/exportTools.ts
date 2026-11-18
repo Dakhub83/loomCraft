@@ -4,7 +4,7 @@ import { StaticCanvas, type FabricObject } from 'fabric';
 import { jsPDF } from 'jspdf';
 import { GarmentSVG } from '../components/GarmentTemplates';
 import { GARMENT_H, GARMENT_W, getGarment, getView, getZone, garmentViews, viewLabel, zonePpi } from '../data/garments';
-import type { CanvasJSON, GarmentId, ManufacturingSpecs, PrintEffect, PrintZone, SizeChart, SizeCharts, ViewDesigns, ViewEffects, ViewId } from '../types';
+import type { CanvasJSON, FabricChoices, GarmentId, ManufacturingSpecs, PrintEffect, PrintZone, SizeChart, SizeCharts, ViewDesigns, ViewEffects, ViewId } from '../types';
 import { chartToCSV, defaultSizeChart, formatMeasure, measureOverlayMarkup, validateChart } from './sizeCharts';
 import { effectFor, hasArtwork } from '../types';
 import { extractPalette, hexToRgb, isDark, nearestPantone, normalizeHex } from './color';
@@ -22,6 +22,7 @@ export interface StudioSnapshot {
   effects: ViewEffects;
   sizeCharts?: SizeCharts;
   mfgSpecs?: ManufacturingSpecs;
+  fabrics?: FabricChoices;
 }
 
 const PRINT_DPI = 300;
@@ -371,6 +372,36 @@ export async function buildTurntableTextures(
   const front = await side(frontView, frontArt, false);
   const back = backView ? await side(backView, [backView], labelled) : await side(frontView, [], labelled);
   return { front, back };
+}
+
+/**
+ * Artwork of every view at `pxPerIn`, print effect applied, covering the whole print zone (transparent
+ * outside the art). The 3D viewer projects each one onto its zone at true size.
+ */
+export async function buildPrintTextures(
+  s: Pick<StudioSnapshot, 'garment' | 'designs' | 'effects'>,
+  pxPerIn = 48,
+): Promise<Partial<Record<ViewId, HTMLCanvasElement>>> {
+  const out: Partial<Record<ViewId, HTMLCanvasElement>> = {};
+  for (const v of garmentViews(s.garment)) {
+    const json = s.designs[v.id];
+    if (!json || !hasArtwork(json)) continue;
+    const m = pxPerIn / zonePpi(v.zone);
+    const art = await renderArtwork(json, v.zone, m);
+    const c = document.createElement('canvas');
+    c.width = Math.round(v.zone.w * m);
+    c.height = Math.round(v.zone.h * m);
+    const x = c.getContext('2d')!;
+    const filter = ensureFilterInDocument(effectFor(s.effects, v.id), m);
+    if (filter) x.filter = filter;
+    x.drawImage(art.canvas, 0, 0, c.width, c.height);
+    // Filters (grain, bevel) may leave faint pixels outside the artwork; keep only the artwork's own alpha.
+    x.filter = 'none';
+    x.globalCompositeOperation = 'destination-in';
+    x.drawImage(art.canvas, 0, 0, c.width, c.height);
+    out[v.id] = c;
+  }
+  return out;
 }
 
 export async function exportMockupPNG(s: StudioSnapshot): Promise<void> {
