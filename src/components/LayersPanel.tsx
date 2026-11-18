@@ -165,7 +165,7 @@ export function LayersPanel({ layers, selection, canvas }: Props) {
                 key={l.id}
                 onClick={() => api()?.selectLayer(l.id)}
                 className={`group flex cursor-pointer items-center gap-2 rounded-md border px-2 py-1.5 text-xs transition ${
-                  selected ? 'border-amber-400/50 bg-amber-400/[0.08]' : 'border-transparent hover:bg-white/[0.04]'
+                  selected ? 'border-violet-500/50 bg-violet-500/[0.08]' : 'border-transparent hover:bg-white/[0.04]'
                 } ${l.visible ? '' : 'opacity-50'}`}
               >
                 <span className="text-zinc-500">{KIND_ICON[l.kind]}</span>
@@ -235,7 +235,7 @@ export function LayersPanel({ layers, selection, canvas }: Props) {
                       e.stopPropagation();
                       api()?.toggleLock(l.id);
                     }}
-                    className={`rounded p-0.5 hover:text-white ${l.locked ? 'text-amber-400' : 'text-zinc-400'}`}
+                    className={`rounded p-0.5 hover:text-white ${l.locked ? 'text-violet-400' : 'text-zinc-400'}`}
                   >
                     {l.locked ? <Lock size={13} /> : <Unlock size={13} />}
                   </button>

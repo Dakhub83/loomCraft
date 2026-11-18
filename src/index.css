@@ -17,13 +17,13 @@ body,
 
 @layer components {
   .lc-input {
-    @apply rounded-md border border-white/10 bg-black/30 px-2.5 py-1.5 text-sm text-zinc-100 placeholder:text-zinc-600 transition focus:border-amber-400/60 focus:outline-none focus:ring-2 focus:ring-amber-400/15;
+    @apply rounded-md border border-white/10 bg-black/30 px-2.5 py-1.5 text-sm text-zinc-100 placeholder:text-zinc-600 transition focus:border-violet-500/60 focus:outline-none focus:ring-2 focus:ring-violet-500/15;
   }
   .lc-btn {
     @apply inline-flex items-center justify-center rounded-md border border-white/10 bg-white/[0.04] text-zinc-300 transition hover:border-white/20 hover:bg-white/[0.08] hover:text-white disabled:pointer-events-none disabled:opacity-35;
   }
   .lc-btn-primary {
-    @apply inline-flex items-center justify-center rounded-md border border-amber-300/40 bg-amber-400 font-medium text-zinc-950 shadow-[0_0_0_1px_rgba(0,0,0,0.2),0_6px_20px_-6px_rgba(245,176,65,0.55)] transition hover:bg-amber-300 disabled:pointer-events-none disabled:opacity-50;
+    @apply inline-flex items-center justify-center rounded-md border border-violet-400/40 bg-violet-500 font-medium text-white shadow-[0_0_0_1px_rgba(0,0,0,0.2),0_6px_20px_-6px_rgba(139,92,246,0.55)] transition hover:bg-violet-400 disabled:pointer-events-none disabled:opacity-50;
   }
 }
 
@@ -44,7 +44,7 @@ body,
 }
 
 .lc-range {
-  accent-color: #f5b041;
+  accent-color: #8b5cf6;
   height: 4px;
   cursor: pointer;
 }

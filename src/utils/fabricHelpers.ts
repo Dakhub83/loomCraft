@@ -34,9 +34,9 @@ export function configureFabric() {
   FabricObject.customProperties = ['id', 'name'];
   Object.assign(InteractiveFabricObject.ownDefaults, {
     transparentCorners: false,
-    cornerColor: '#f5b041',
+    cornerColor: '#8b5cf6',
     cornerStrokeColor: '#141418',
-    borderColor: '#f5b041',
+    borderColor: '#8b5cf6',
     cornerStyle: 'circle',
     cornerSize: 11,
     borderScaleFactor: 1.5,

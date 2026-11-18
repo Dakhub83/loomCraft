@@ -51,6 +51,33 @@ export interface SelectionInfo {
   };
 }
 
+export type SizeUnit = 'in' | 'cm';
+
+/** One point of measure (POM). Values are always stored in inches; `unit` only affects display. */
+export interface MeasurePoint {
+  id: string;
+  code: string;
+  name: string;
+  how: string;
+  /** Grade increment per size step (inches). */
+  grade: number;
+  /** ± tolerance (inches). */
+  tolerance: number;
+  values: Record<string, number>;
+  /** Key into the measurement diagram lines, when this POM has one. */
+  diagram?: string;
+}
+
+export interface SizeChart {
+  sizes: string[];
+  baseSize: string;
+  unit: SizeUnit;
+  points: MeasurePoint[];
+  includeInTechPack: boolean;
+}
+
+export type SizeCharts = Partial<Record<GarmentId, SizeChart>>;
+
 export interface Draft {
   id: string;
   name: string;
@@ -58,6 +85,7 @@ export interface Draft {
   color: string;
   designs: ViewDesigns;
   effects: ViewEffects;
+  sizeCharts?: SizeCharts;
   thumbnail?: string;
   createdAt: number;
   updatedAt: number;
@@ -70,6 +98,7 @@ export interface Workspace {
   color: string;
   designs: ViewDesigns;
   effects: ViewEffects;
+  sizeCharts?: SizeCharts;
 }
 
 export const VIEWS: ViewId[] = ['front', 'back', 'sleeve'];

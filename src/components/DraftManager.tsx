@@ -62,7 +62,7 @@ export function DraftManager({ open, drafts, currentId, onClose, onLoad, onRenam
             <div
               key={d.id}
               className={`group flex gap-3 rounded-xl border p-2.5 transition ${
-                d.id === currentId ? 'border-amber-400/50 bg-amber-400/[0.05]' : 'border-white/[0.07] bg-white/[0.02] hover:border-white/15'
+                d.id === currentId ? 'border-violet-500/50 bg-violet-500/[0.05]' : 'border-white/[0.07] bg-white/[0.02] hover:border-white/15'
               }`}
             >
               <button
@@ -89,14 +89,14 @@ export function DraftManager({ open, drafts, currentId, onClose, onLoad, onRenam
                     className="lc-input h-7 px-2 py-0 text-sm"
                   />
                 ) : (
-                  <button onClick={() => onLoad(d)} className="truncate text-left text-sm font-medium text-zinc-100 hover:text-amber-300">
+                  <button onClick={() => onLoad(d)} className="truncate text-left text-sm font-medium text-zinc-100 hover:text-violet-300">
                     {d.name}
                   </button>
                 )}
                 <span className="mt-0.5 flex items-center gap-1.5 text-[11px] text-zinc-500">
                   <span className="h-2.5 w-2.5 rounded-full border border-white/20" style={{ background: d.color }} />
                   {GARMENTS[d.garment]?.short} · {timeAgo(d.updatedAt)}
-                  {d.id === currentId && <span className="font-semibold text-amber-400">· open</span>}
+                  {d.id === currentId && <span className="font-semibold text-violet-400">· open</span>}
                 </span>
                 <div className="mt-auto flex gap-1 pt-2">
                   {confirmDelete === d.id ? (

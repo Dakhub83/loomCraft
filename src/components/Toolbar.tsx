@@ -47,7 +47,7 @@ export function Section({ title, icon, children, right }: { title: string; icon:
     <section className="border-b border-white/[0.06] px-4 py-4">
       <div className="mb-3 flex items-center justify-between">
         <h3 className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-400">
-          <span className="text-amber-400/90">{icon}</span>
+          <span className="text-violet-400/90">{icon}</span>
           {title}
         </h3>
         {right}
@@ -149,7 +149,7 @@ export function Toolbar(p: Props) {
               title={g.name}
               className={`group flex flex-col items-center rounded-lg border p-1.5 pb-2 transition ${
                 p.garment === g.id
-                  ? 'border-amber-400/70 bg-amber-400/[0.07]'
+                  ? 'border-violet-500/70 bg-violet-500/[0.07]'
                   : 'border-white/[0.07] bg-white/[0.02] hover:border-white/20'
               }`}
             >
@@ -169,7 +169,7 @@ export function Toolbar(p: Props) {
               title={`${s.name} ${s.hex}`}
               onClick={() => p.onColor(s.hex)}
               className={`aspect-square rounded-md border transition ${
-                p.color.toUpperCase() === s.hex ? 'border-amber-400 ring-2 ring-amber-400/40' : 'border-white/15 hover:scale-105'
+                p.color.toUpperCase() === s.hex ? 'border-violet-500 ring-2 ring-violet-500/40' : 'border-white/15 hover:scale-105'
               }`}
               style={{ background: s.hex }}
             />
@@ -208,7 +208,7 @@ export function Toolbar(p: Props) {
               }`}
             >
               {VIEW_LABEL[v]}
-              {p.viewsWithArt[v] && <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-amber-400" />}
+              {p.viewsWithArt[v] && <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-violet-500" />}
             </button>
           ))}
         </div>
@@ -240,10 +240,10 @@ export function Toolbar(p: Props) {
             handleFiles(e.dataTransfer.files);
           }}
           className={`flex w-full flex-col items-center gap-1.5 rounded-lg border border-dashed px-3 py-5 text-center transition ${
-            dragOver ? 'border-amber-400 bg-amber-400/10' : 'border-white/15 hover:border-white/30 hover:bg-white/[0.02]'
+            dragOver ? 'border-violet-500 bg-violet-500/10' : 'border-white/15 hover:border-white/30 hover:bg-white/[0.02]'
           }`}
         >
-          <Upload size={18} className={uploading ? 'animate-pulse text-amber-400' : 'text-zinc-400'} />
+          <Upload size={18} className={uploading ? 'animate-pulse text-violet-400' : 'text-zinc-400'} />
           <span className="text-xs font-medium text-zinc-200">{uploading ? 'Adding…' : 'Upload PNG / SVG'}</span>
           <span className="text-[11px] text-zinc-500">Multiple files · drag & drop · vectors stay vector</span>
         </button>
@@ -257,7 +257,7 @@ export function Toolbar(p: Props) {
               key={pl.id}
               onClick={() => p.onPlacement(pl)}
               title={`${pl.name} (${pl.view}) – ${pl.hint}. Applies to the selection, or all layers when nothing is selected.`}
-              className="flex flex-col items-center gap-1 rounded-lg border border-white/[0.07] bg-white/[0.02] px-1 py-2 transition hover:border-amber-400/50 hover:bg-amber-400/[0.06]"
+              className="flex flex-col items-center gap-1 rounded-lg border border-white/[0.07] bg-white/[0.02] px-1 py-2 transition hover:border-violet-500/50 hover:bg-violet-500/[0.06]"
             >
               <PlacementGlyph id={pl.id} />
               <span className="text-[11px] font-medium leading-tight text-zinc-200">{pl.name}</span>
@@ -265,7 +265,7 @@ export function Toolbar(p: Props) {
           ))}
         </div>
         <label className="mt-2.5 flex cursor-pointer items-center gap-2 text-[11px] text-zinc-400">
-          <input type="checkbox" checked={p.autoPlace} onChange={(e) => p.onAutoPlace(e.target.checked)} className="accent-amber-400" />
+          <input type="checkbox" checked={p.autoPlace} onChange={(e) => p.onAutoPlace(e.target.checked)} className="accent-violet-500" />
           Auto-place uploads (front → Center Chest, back → Full Back)
         </label>
       </Section>
@@ -274,7 +274,7 @@ export function Toolbar(p: Props) {
       <Section
         title={selText ? 'Edit text' : 'Typography'}
         icon={<Type size={14} />}
-        right={selText ? <span className="rounded bg-amber-400/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-300">SELECTED</span> : null}
+        right={selText ? <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-violet-300">SELECTED</span> : null}
       >
         {!selText && (
           <div className="mb-2 flex gap-2">
@@ -388,7 +388,7 @@ export function Toolbar(p: Props) {
               onClick={() => p.onEffect(fx.id)}
               title={fx.blurb}
               className={`rounded-lg border px-2.5 py-2 text-left transition ${
-                p.effect === fx.id ? 'border-amber-400/70 bg-amber-400/[0.08]' : 'border-white/[0.07] bg-white/[0.02] hover:border-white/20'
+                p.effect === fx.id ? 'border-violet-500/70 bg-violet-500/[0.08]' : 'border-white/[0.07] bg-white/[0.02] hover:border-white/20'
               }`}
             >
               <span className="block text-xs font-medium text-zinc-100">{fx.name}</span>
@@ -407,7 +407,7 @@ function ToggleBtn({ active, onClick, title, children }: { active: boolean; onCl
       onClick={onClick}
       title={title}
       className={`grid h-8 w-8 place-items-center rounded-md border transition ${
-        active ? 'border-amber-400/60 bg-amber-400/15 text-amber-300' : 'border-white/[0.08] text-zinc-400 hover:text-zinc-100'
+        active ? 'border-violet-500/60 bg-violet-500/15 text-violet-300' : 'border-white/[0.08] text-zinc-400 hover:text-zinc-100'
       }`}
     >
       {children}
@@ -424,7 +424,7 @@ function PlacementGlyph({ id }: { id: PlacementPreset['id'] }) {
   return (
     <svg width="36" height="32" viewBox="0 0 36 32" aria-hidden>
       <path d="M12 3 C15 6 21 6 24 3 L32 7 L29 13 L26 12 L26 30 L10 30 L10 12 L7 13 L4 7 Z" fill="none" stroke="#71717a" strokeWidth="1.2" strokeLinejoin="round" />
-      <g fill="#f5b041" opacity="0.9">{box}</g>
+      <g fill="#8b5cf6" opacity="0.9">{box}</g>
     </svg>
   );
 }

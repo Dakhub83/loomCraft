@@ -1,4 +1,4 @@
-import { FilePlus2, FolderOpen, Redo2, Save, Undo2 } from 'lucide-react';
+import { FilePlus2, FolderOpen, Redo2, Ruler, Save, Undo2 } from 'lucide-react';
 
 export function LoomCraftLogo({ size = 30 }: { size?: number }) {
   return (
@@ -6,14 +6,14 @@ export function LoomCraftLogo({ size = 30 }: { size?: number }) {
       <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden>
         <rect width="32" height="32" rx="8" fill="#22222a" />
         <g strokeWidth="3.2" strokeLinecap="round" fill="none">
-          <path d="M6 11h20M6 21h20" stroke="#fde7c0" />
-          <path d="M11 6v20M21 6v20" stroke="#f5b041" />
+          <path d="M6 11h20M6 21h20" stroke="#ddd6fe" />
+          <path d="M11 6v20M21 6v20" stroke="#8b5cf6" />
           {/* re-draw crossings so the threads appear woven over/under */}
-          <path d="M9 11h4M19 21h4" stroke="#fde7c0" />
+          <path d="M9 11h4M19 21h4" stroke="#ddd6fe" />
         </g>
       </svg>
       <span className="text-[19px] font-bold tracking-tight text-white">
-        Loom<span className="text-amber-400">Craft</span>
+        Loom<span className="text-violet-400">Craft</span>
       </span>
     </div>
   );
@@ -32,6 +32,7 @@ interface Props {
   onSaveAs(): void;
   onNew(): void;
   onOpenDrafts(): void;
+  onOpenSizeChart(): void;
   draftCount: number;
 }
 
@@ -46,10 +47,10 @@ export function Header(p: Props) {
           value={p.name}
           onChange={(e) => p.onName(e.target.value)}
           spellCheck={false}
-          className="w-[260px] min-w-0 rounded-md border border-transparent bg-transparent px-2 py-1 text-center text-sm font-medium text-zinc-100 hover:border-white/10 focus:border-amber-400/50 focus:bg-black/30 focus:outline-none"
+          className="w-[260px] min-w-0 rounded-md border border-transparent bg-transparent px-2 py-1 text-center text-sm font-medium text-zinc-100 hover:border-white/10 focus:border-violet-500/50 focus:bg-black/30 focus:outline-none"
           title="Design name"
         />
-        <span className={`whitespace-nowrap text-[11px] ${p.dirty ? 'text-amber-400' : 'text-zinc-500'}`}>{p.savedLabel}</span>
+        <span className={`whitespace-nowrap text-[11px] ${p.dirty ? 'text-violet-400' : 'text-zinc-500'}`}>{p.savedLabel}</span>
       </div>
 
       <div className="flex items-center gap-1">
@@ -60,6 +61,9 @@ export function Header(p: Props) {
           <Redo2 size={15} />
         </button>
         <span className="mx-2 h-5 w-px bg-white/10" />
+        <button onClick={p.onOpenSizeChart} className="lc-btn h-8 gap-1.5 px-2.5 text-xs" title="Size / spec chart">
+          <Ruler size={14} /> Size Chart
+        </button>
         <button onClick={p.onNew} className="lc-btn h-8 gap-1.5 px-2.5 text-xs" title="New design">
           <FilePlus2 size={14} /> New
         </button>

@@ -3,7 +3,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { StaticCanvas, type FabricObject } from 'fabric';
 import { jsPDF } from 'jspdf';
 import { GARMENT_H, GARMENT_W, GARMENTS, GarmentSVG, getZone, zonePpi } from '../components/GarmentTemplates';
-import type { CanvasJSON, GarmentId, PrintEffect, PrintZone, ViewDesigns, ViewEffects, ViewId } from '../types';
+import type { CanvasJSON, GarmentId, PrintEffect, PrintZone, SizeChart, SizeCharts, ViewDesigns, ViewEffects, ViewId } from '../types';
+import { chartToCSV, defaultSizeChart, formatMeasure, measureOverlayMarkup, validateChart } from './sizeCharts';
 import { VIEWS, hasArtwork } from '../types';
 import { extractPalette, hexToRgb, nearestPantone, normalizeHex } from './color';
 import { ensureFonts } from './fonts';
@@ -18,6 +19,7 @@ export interface StudioSnapshot {
   view: ViewId;
   designs: ViewDesigns;
   effects: ViewEffects;
+  sizeCharts?: SizeCharts;
 }
 
 const PRINT_DPI = 300;
@@ -294,6 +296,24 @@ function downscaleToJpeg(src: HTMLCanvasElement, width: number, quality = 0.9): 
   return c.toDataURL('image/jpeg', quality);
 }
 
+/** Garment front + measurement lines, rasterized for the PDF size-spec page. */
+async function renderSpecDiagram(garment: GarmentId, color: string, chart: SizeChart): Promise<string> {
+  const markup =
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${GARMENT_W} ${GARMENT_H}" width="${GARMENT_W}" height="${GARMENT_H}">` +
+    garmentMarkup(garment, 'front', color, 'lcspec') +
+    measureOverlayMarkup(garment, chart.points, { color: '#7c3aed' }) +
+    '</svg>';
+  const img = await svgToImage(markup);
+  const c = document.createElement('canvas');
+  c.width = GARMENT_W * 2;
+  c.height = GARMENT_H * 2;
+  const ctx = c.getContext('2d')!;
+  ctx.fillStyle = '#f6f6f4';
+  ctx.fillRect(0, 0, c.width, c.height);
+  ctx.drawImage(img, 0, 0, c.width, c.height);
+  return c.toDataURL('image/jpeg', 0.9);
+}
+
 /** Yield to the event loop so progress text can paint between heavy render steps. */
 const breathe = () => new Promise((r) => setTimeout(r, 0));
 
@@ -370,10 +390,16 @@ export async function exportProductionZip(
     });
   }
 
+  const chart = s.sizeCharts?.[s.garment] ?? defaultSizeChart(s.garment);
+  const csvName = `specs/${slug}-size-chart.csv`;
+  zip.file(csvName, chartToCSV(chart, GARMENTS[s.garment].name), { compression: 'DEFLATE' });
+  files.push(csvName);
+
   onProgress?.('Building tech pack PDF…');
   await breathe();
+  const spec = chart.includeInTechPack ? { chart, diagram: await renderSpecDiagram(s.garment, s.color, chart) } : null;
   const pdfName = `${slug}-tech-pack.pdf`;
-  zip.file(pdfName, buildTechPack(s, reports).output('blob'), { compression: 'DEFLATE' });
+  zip.file(pdfName, buildTechPack(s, reports, spec).output('blob'), { compression: 'DEFLATE' });
   files.push(pdfName);
 
   onProgress?.('Zipping…');
@@ -388,12 +414,14 @@ export async function exportProductionZip(
 
 const INK: [number, number, number] = [24, 24, 28];
 const MUTED: [number, number, number] = [110, 110, 118];
-const AMBER: [number, number, number] = [228, 160, 52];
+const ACCENT: [number, number, number] = [124, 58, 237];
+/** Lighter violet for text on the dark header band. */
+const ACCENT_LIGHT: [number, number, number] = [167, 139, 250];
 const LINE: [number, number, number] = [222, 222, 226];
 
 const fmt = (n: number) => n.toFixed(2);
 
-function buildTechPack(s: StudioSnapshot, reports: ViewReport[]): jsPDF {
+function buildTechPack(s: StudioSnapshot, reports: ViewReport[], spec: { chart: SizeChart; diagram: string } | null): jsPDF {
   const doc = new jsPDF({ unit: 'pt', format: 'letter' });
   // jsPDF's built-in Helvetica only covers a limited charset – normalize typographic symbols to ASCII.
   const ascii = (t: string) =>
@@ -431,31 +459,53 @@ function buildTechPack(s: StudioSnapshot, reports: ViewReport[]): jsPDF {
     doc.roundedRect(x, y, size, size, 2, 2, 'FD');
   };
 
-  /* header band + logo */
-  doc.setFillColor(20, 20, 24);
-  doc.rect(0, 0, W, 66, 'F');
-  doc.setFillColor(38, 38, 45);
-  doc.roundedRect(M, 17, 32, 32, 7, 7, 'F');
-  doc.setLineCap('round');
-  doc.setLineWidth(3);
-  doc.setDrawColor(253, 231, 192);
-  doc.line(M + 6, M - 8, M + 26, M - 8);
-  doc.line(M + 6, M + 4, M + 26, M + 4);
-  doc.setDrawColor(AMBER[0], AMBER[1], AMBER[2]);
-  doc.line(M + 11, 23, M + 11, 43);
-  doc.line(M + 21, 23, M + 21, 43);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(21);
-  doc.setTextColor(255, 255, 255);
-  doc.text('Loom', M + 42, 41);
-  setText(AMBER);
-  doc.text('Craft', M + 42 + doc.getTextWidth('Loom'), 41);
-  doc.setFontSize(10);
-  doc.text('TECH PACK', W - M, 33, { align: 'right', charSpace: 1.5 });
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  doc.setTextColor(170, 170, 178);
-  doc.text(`${styleNo}  ·  ${dateStr}`, W - M, 46, { align: 'right' });
+  const pageCount = spec ? 2 : 1;
+
+  const drawHeader = (title: string) => {
+    doc.setFillColor(20, 20, 24);
+    doc.rect(0, 0, W, 66, 'F');
+    doc.setFillColor(38, 38, 45);
+    doc.roundedRect(M, 17, 32, 32, 7, 7, 'F');
+    doc.setLineCap('round');
+    doc.setLineWidth(3);
+    doc.setDrawColor(221, 214, 254);
+    doc.line(M + 6, M - 8, M + 26, M - 8);
+    doc.line(M + 6, M + 4, M + 26, M + 4);
+    doc.setDrawColor(ACCENT_LIGHT[0], ACCENT_LIGHT[1], ACCENT_LIGHT[2]);
+    doc.line(M + 11, 23, M + 11, 43);
+    doc.line(M + 21, 23, M + 21, 43);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(21);
+    doc.setTextColor(255, 255, 255);
+    doc.text('Loom', M + 42, 41);
+    setText(ACCENT_LIGHT);
+    doc.text('Craft', M + 42 + doc.getTextWidth('Loom'), 41);
+    doc.setFontSize(10);
+    doc.text(title, W - M, 33, { align: 'right', charSpace: 1.5 });
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(170, 170, 178);
+    doc.text(`${styleNo}  ·  ${dateStr}`, W - M, 46, { align: 'right' });
+  };
+
+  const drawFooter = (page: number) => {
+    const ft = 742;
+    doc.setDrawColor(LINE[0], LINE[1], LINE[2]);
+    doc.setLineWidth(0.75);
+    doc.line(M, ft, W - M, ft);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    setText(INK);
+    doc.text('Generated by ', M, ft + 16);
+    setText(ACCENT);
+    doc.text('LoomCraft', M + doc.getTextWidth('Generated by '), ft + 16);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    setText(MUTED);
+    doc.text(`${styleNo}  ·  ${now.toLocaleString()}  ·  Page ${page} of ${pageCount}`, W - M, ft + 16, { align: 'right' });
+  };
+
+  drawHeader('TECH PACK');
 
   /* style info */
   let y = 92;
@@ -517,7 +567,7 @@ function buildTechPack(s: StudioSnapshot, reports: ViewReport[]): jsPDF {
     doc.setFontSize(10);
     setText(INK);
     doc.text(`${r.view.toUpperCase()}`, colR + 8, ry);
-    setText(AMBER);
+    setText(ACCENT);
     doc.text(effectName(r.effect), colR + colRW - 8, ry, { align: 'right' });
 
     const rows: Array<[string, string]> = [
@@ -607,19 +657,130 @@ function buildTechPack(s: StudioSnapshot, reports: ViewReport[]): jsPDF {
     'approximations — confirm against a physical guide and approve a strike-off before bulk production.';
   doc.text(doc.splitTextToSize(note, W - 2 * M) as string[], M, footerTop - 14);
 
-  /* footer */
-  doc.setDrawColor(LINE[0], LINE[1], LINE[2]);
-  doc.line(M, footerTop, W - M, footerTop);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8.5);
-  setText(INK);
-  doc.text('Generated by ', M, footerTop + 16);
-  setText(AMBER);
-  doc.text('LoomCraft', M + doc.getTextWidth('Generated by '), footerTop + 16);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.5);
-  setText(MUTED);
-  doc.text(`${styleNo}  ·  ${now.toLocaleString()}  ·  Page 1 of 1`, W - M, footerTop + 16, { align: 'right' });
+  drawFooter(1);
+
+  /* ---------------- page 2: size specification ---------------- */
+  if (spec) {
+    const { chart, diagram } = spec;
+    const unitName = chart.unit === 'in' ? 'inches' : 'cm';
+    doc.addPage('letter', 'portrait');
+    drawHeader('SIZE SPEC');
+
+    let sy = 92;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    setText(INK);
+    doc.text('Size Specification', M, sy);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    setText(MUTED);
+    doc.text(`${garment.name}  -  base size ${chart.baseSize}  -  ${unitName}, garment laid flat`, M, sy + 14);
+    sy += 30;
+    doc.setDrawColor(LINE[0], LINE[1], LINE[2]);
+    doc.line(M, sy, W - M, sy);
+    sy += 12;
+
+    // diagram + legend
+    const dW = 190;
+    const dH = dW * (GARMENT_H / GARMENT_W);
+    doc.addImage(diagram, 'JPEG', M, sy, dW, dH);
+    doc.rect(M, sy, dW, dH);
+    const lx = M + dW + 18;
+    let ly = sy + 6;
+    label('Points of measure', lx, ly);
+    ly += 6;
+    const legendW = W - M - lx;
+    for (const p of chart.points) {
+      if (ly > sy + dH - 6) break;
+      ly += 13.5;
+      doc.setFillColor(ACCENT[0], ACCENT[1], ACCENT[2]);
+      doc.circle(lx + 5, ly - 3, 5, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(p.code.length > 1 ? 5.5 : 6.5);
+      doc.setTextColor(255, 255, 255);
+      doc.text(p.code, lx + 5, ly - 0.8, { align: 'center' });
+      doc.setFontSize(8);
+      setText(INK);
+      doc.text(p.name, lx + 15, ly);
+      doc.setFont('helvetica', 'normal');
+      setText(MUTED);
+      const nameW = doc.getTextWidth(p.name);
+      if (p.how) doc.text((doc.splitTextToSize(`- ${p.how}`, legendW - 20 - nameW - 4) as string[])[0], lx + 15 + nameW + 4, ly);
+    }
+    sy += dH + 18;
+
+    // graded table
+    const codeW = 26;
+    const nameColW = 150;
+    const tolW = 40;
+    const colW = (W - 2 * M - codeW - nameColW - tolW) / chart.sizes.length;
+    const rowH = 16;
+    const cols = { code: M, name: M + codeW, tol: M + codeW + nameColW };
+    const sizeX = (i: number) => cols.tol + tolW + i * colW;
+    const baseIdx = chart.sizes.indexOf(chart.baseSize);
+    const maxRows = Math.floor((742 - 40 - sy - rowH) / rowH);
+    const shownRows = Math.min(maxRows, chart.points.length);
+
+    doc.setFillColor(242, 242, 245);
+    doc.rect(M, sy, W - 2 * M, rowH, 'F');
+    for (let r = 1; r <= shownRows; r += 2) {
+      doc.setFillColor(250, 250, 251);
+      doc.rect(M, sy + rowH * (r + 1), W - 2 * M, rowH, 'F');
+    }
+    if (baseIdx >= 0) {
+      doc.setFillColor(237, 233, 254);
+      doc.rect(sizeX(baseIdx), sy, colW, rowH * (shownRows + 1), 'F');
+    }
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    setText(MUTED);
+    doc.text('CODE', cols.code + 4, sy + 10.5);
+    doc.text('POINT OF MEASURE', cols.name, sy + 10.5);
+    doc.text('TOL +/-', cols.tol + tolW - 4, sy + 10.5, { align: 'right' });
+    chart.sizes.forEach((sz, i) => {
+      if (i === baseIdx) setText(ACCENT);
+      else setText(MUTED);
+      doc.text(sz, sizeX(i) + colW - 5, sy + 10.5, { align: 'right' });
+    });
+
+    const issues = validateChart(chart);
+    chart.points.slice(0, shownRows).forEach((p, r) => {
+      const ry = sy + rowH * (r + 1);
+      doc.setDrawColor(235, 235, 238);
+      doc.line(M, ry + rowH, W - M, ry + rowH);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      setText(ACCENT);
+      doc.text(p.code, cols.code + 4, ry + 11);
+      setText(INK);
+      doc.setFont('helvetica', 'normal');
+      doc.text((doc.splitTextToSize(p.name, nameColW - 6) as string[])[0], cols.name, ry + 11);
+      setText(MUTED);
+      doc.text(formatMeasure(p.tolerance, chart.unit), cols.tol + tolW - 4, ry + 11, { align: 'right' });
+      chart.sizes.forEach((sz, i) => {
+        const v = p.values[sz];
+        const bad = issues.some((x) => x.pointId === p.id && x.size === sz && x.kind !== 'off-grade');
+        doc.setFont('helvetica', i === baseIdx ? 'bold' : 'normal');
+        if (bad) doc.setTextColor(200, 40, 40);
+        else setText(INK);
+        doc.text(v == null ? '-' : formatMeasure(v, chart.unit), sizeX(i) + colW - 5, ry + 11, { align: 'right' });
+      });
+    });
+    let ny = sy + rowH * (shownRows + 1) + 16;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    setText(MUTED);
+    if (chart.points.length > shownRows) {
+      doc.text(`+ ${chart.points.length - shownRows} more measurements in the CSV`, M, ny);
+      ny += 10;
+    }
+    const specNote =
+      `All measurements in ${unitName}, taken flat. Tolerances apply to every size. ` +
+      (issues.some((i) => i.kind !== 'off-grade') ? 'Values in red break the grade progression and need review. ' : '') +
+      'Approve a fit sample in the base size before grading production.';
+    doc.text(doc.splitTextToSize(specNote, W - 2 * M) as string[], M, ny);
+    drawFooter(2);
+  }
 
   return doc;
 }

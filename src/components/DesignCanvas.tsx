@@ -86,7 +86,7 @@ const readAsDataURL = (file: File) =>
   });
 
 const isTypingTarget = (t: EventTarget | null) =>
-  t instanceof HTMLElement && !!t.closest('input, textarea, select, [contenteditable="true"]');
+  t instanceof HTMLElement && !!t.closest('input, textarea, select, [contenteditable="true"], [role="dialog"]');
 
 const DesignCanvasInner = forwardRef<DesignCanvasHandle, Props>(function DesignCanvas(props, ref) {
   const { zone, effect } = props;
@@ -246,8 +246,8 @@ const DesignCanvasInner = forwardRef<DesignCanvasHandle, Props>(function DesignC
       preserveObjectStacking: true,
       controlsAboveOverlay: true,
       stopContextMenu: true,
-      selectionColor: 'rgba(245,176,65,0.08)',
-      selectionBorderColor: '#f5b041',
+      selectionColor: 'rgba(139,92,246,0.08)',
+      selectionBorderColor: '#8b5cf6',
       selectionLineWidth: 1,
     });
     fcRef.current = canvas;

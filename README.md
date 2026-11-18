@@ -12,6 +12,12 @@ npm run build      # type-check + production build
 
 - **Garment templates**: Oversized Drop-Shoulder Tee, Heavyweight Boxy Hoodie and Relaxed Crewneck, each with Front, Back and Sleeve views. Ribbing, stitching, folds and fabric texture are all derived from the chosen hex color.
 - **Design canvas**: a Fabric.js canvas sits over the safe print zone. It supports drag, corner-scale and rotate, snaps to the center with guides, and has layer ordering, lock/hide, and undo/redo per view.
+- **Size / spec chart**: a graded measurement table for each garment, XXS to 5XL.
+  - Tolerances and grade rules for each measurement, with entries in inches or cm (fractions like `23 1/2` work).
+  - Auto-grade from a base size, or infer grade rules from existing values.
+  - Checks that flag sizes that shrink, missing values and values outside tolerance.
+  - Per-row sparklines, plus a grading chart: one measurement with its tolerance band, or every measurement compared by % change from base.
+  - A diagram of where each measurement is taken, CSV export, and a size-spec page in the tech pack PDF.
 - **Placement presets**: Left Chest, Center Chest and Full Back scale and align artwork, and uploads can be auto-placed.
 - **Keyboard**: Ctrl/Cmd+Z undo, Ctrl/Cmd+Y or Ctrl/Cmd+Shift+Z redo, Ctrl/Cmd+D duplicate, Delete to remove, arrows to nudge 1px (Shift for 10px), Ctrl/Cmd+S to save.
 - **Assets and type**: upload multiple PNG, SVG, JPG or WebP files (SVGs stay vector). Text supports any Google Font, letter spacing, weight, style and alignment.
@@ -19,7 +25,8 @@ npm run build      # type-check + production build
 - **Production Pack (.ZIP)**: one click bundles:
   - front and back mockup PNGs (2000 × 2240 px)
   - a 300 DPI transparent print PNG per view, cropped to the artwork, with DPI metadata
-  - a 1-page branded PDF tech pack with print sizes in inches, placement, and Hex + nearest-Pantone colors
+  - a branded PDF tech pack: page 1 has print placements, sizes in inches, and Hex + nearest-Pantone colors; page 2 has the size spec
+  - the size chart as a CSV
 
   A single mockup PNG export is also available.
 - **Drafts**: stored in IndexedDB (no ~5 MB limit), with save, save as, rename, duplicate, delete and thumbnails. The working session also autosaves.
@@ -36,6 +43,8 @@ src/
     LayersPanel.tsx             selection properties + layer list
     ExportPanel.tsx             export buttons
     DraftManager.tsx            collection drawer
+    SizeChartEditor.tsx         size spec dialog (table, diagram, grading tools)
+    GradingChart.tsx            grading line charts + sparklines
     Header.tsx                  logo, name, undo/redo, save
   utils/
     exportTools.ts              mockup compose, 300 DPI PNG, PDF tech pack
@@ -44,6 +53,7 @@ src/
     fonts.ts                    Google Fonts loader
     storage.ts                  IndexedDB persistence (idb-keyval)
     placements.ts               placement presets
+    sizeCharts.ts               size spec model, grading, validation, diagram lines, CSV
     fabricHelpers.ts            Fabric config + helpers
 ```
 

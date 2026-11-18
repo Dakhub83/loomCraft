@@ -5,15 +5,17 @@ import { Toolbar } from './components/Toolbar';
 import { LayersPanel, PropertiesPanel } from './components/LayersPanel';
 import { ExportPanel } from './components/ExportPanel';
 import { DraftManager } from './components/DraftManager';
+import { SizeChartEditor } from './components/SizeChartEditor';
 import { DesignCanvas, type DesignCanvasHandle, type HistoryState } from './components/DesignCanvas';
 import { GARMENT_H, GARMENT_W, GARMENTS, GarmentSVG, getZone } from './components/GarmentTemplates';
-import type { CanvasJSON, Draft, GarmentId, LayerInfo, PrintEffect, SelectionInfo, ViewId, Workspace } from './types';
+import type { CanvasJSON, Draft, GarmentId, LayerInfo, PrintEffect, SelectionInfo, SizeChart, SizeCharts, ViewId, Workspace } from './types';
 import { VIEWS, defaultEffects, emptyDesigns, hasArtwork } from './types';
 import { isDark } from './utils/color';
 import { effectName, filterMarkup } from './utils/printEffects';
 import type { StudioSnapshot } from './utils/exportTools';
 import { refitDesign } from './utils/fabricHelpers';
 import type { PlacementPreset } from './utils/placements';
+import { defaultSizeChart } from './utils/sizeCharts';
 import {
   deleteDraft,
   duplicateDraft,
@@ -62,6 +64,8 @@ function Studio({ initial }: { initial: Workspace | null }) {
   const [designs, setDesigns] = useState(initial?.designs ?? emptyDesigns());
   const [effects, setEffects] = useState(initial?.effects ?? defaultEffects());
   const [view, setView] = useState<ViewId>('front');
+  const [sizeCharts, setSizeCharts] = useState<SizeCharts>(initial?.sizeCharts ?? {});
+  const [sizeChartOpen, setSizeChartOpen] = useState(false);
 
   const [layers, setLayers] = useState<LayerInfo[]>([]);
   const [selection, setSelection] = useState<SelectionInfo | null>(null);
@@ -83,7 +87,7 @@ function Studio({ initial }: { initial: Workspace | null }) {
   const stageRef = useRef<HTMLDivElement>(null);
   const pendingPlacement = useRef<PlacementPreset | null>(null);
 
-  const state = { name, draftId, garment, color, view, designs, effects };
+  const state = { name, draftId, garment, color, view, designs, effects, sizeCharts };
   const stateRef = useRef(state);
   stateRef.current = state;
 
@@ -118,9 +122,9 @@ function Studio({ initial }: { initial: Workspace | null }) {
 
   /* ---------------- autosave workspace (IndexedDB, off the input path) ---------------- */
   useEffect(() => {
-    const t = setTimeout(() => void saveWorkspace({ draftId, name, garment, color, designs, effects }), 600);
+    const t = setTimeout(() => void saveWorkspace({ draftId, name, garment, color, designs, effects, sizeCharts }), 600);
     return () => clearTimeout(t);
-  }, [draftId, name, garment, color, designs, effects]);
+  }, [draftId, name, garment, color, designs, effects, sizeCharts]);
 
   /* ---------------- stage fit ---------------- */
   useEffect(() => {
@@ -195,6 +199,22 @@ function Studio({ initial }: { initial: Workspace | null }) {
     setDirty(true);
   };
 
+  /* ---------------- size chart (one per garment) ---------------- */
+  const storedChart = sizeCharts[garment];
+  const sizeChart = useMemo(() => storedChart ?? defaultSizeChart(garment), [storedChart, garment]);
+  const updateSizeChart = useCallback(
+    (c: SizeChart) => {
+      setSizeCharts((all) => ({ ...all, [garment]: c }));
+      setDirty(true);
+    },
+    [garment],
+  );
+  const resetSizeChart = useCallback(() => {
+    setSizeCharts((all) => ({ ...all, [garment]: defaultSizeChart(garment) }));
+    setDirty(true);
+  }, [garment]);
+  const closeSizeChart = useCallback(() => setSizeChartOpen(false), []);
+
   /* ---------------- drafts ---------------- */
   const getSnapshot = useCallback((): StudioSnapshot => ({ ...stateRef.current }), []);
 
@@ -217,6 +237,7 @@ function Studio({ initial }: { initial: Workspace | null }) {
           color: s.color,
           designs: s.designs,
           effects: s.effects,
+          sizeCharts: s.sizeCharts,
           thumbnail,
           createdAt: existing?.createdAt ?? now,
           updatedAt: now,
@@ -244,6 +265,7 @@ function Studio({ initial }: { initial: Workspace | null }) {
     setColor(d.color);
     setDesigns({ ...emptyDesigns(), ...d.designs });
     setEffects({ ...defaultEffects(), ...d.effects });
+    setSizeCharts(d.sizeCharts ?? {});
     setView('front');
     setDirty(false);
     setSavedAt(d.updatedAt);
@@ -258,6 +280,7 @@ function Studio({ initial }: { initial: Workspace | null }) {
     setDraftId(null);
     setDesigns(emptyDesigns());
     setEffects(defaultEffects());
+    setSizeCharts({});
     setView('front');
     setDirty(false);
     setSavedAt(null);
@@ -333,6 +356,7 @@ function Studio({ initial }: { initial: Workspace | null }) {
           setDraftsOpen(true);
         }}
         draftCount={drafts.length}
+        onOpenSizeChart={() => setSizeChartOpen(true)}
       />
 
       <div className="flex min-h-0 flex-1">
@@ -407,7 +431,7 @@ function Studio({ initial }: { initial: Workspace | null }) {
               <span className="text-zinc-300">{GARMENTS[garment].name}</span> · {view} · {effectName(effects[view])}
             </span>
             <label className="flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap">
-              <input type="checkbox" checked={showZone} onChange={(e) => setShowZone(e.target.checked)} className="accent-amber-400" />
+              <input type="checkbox" checked={showZone} onChange={(e) => setShowZone(e.target.checked)} className="accent-violet-500" />
               Print area
             </label>
             <span className="hidden whitespace-nowrap min-[1700px]:inline">
@@ -422,7 +446,7 @@ function Studio({ initial }: { initial: Workspace | null }) {
               <button className="lc-btn h-6 w-6 p-0" onClick={() => setZoom(Math.min(2, +(scale + 0.1).toFixed(2)))} title="Zoom in">
                 <Plus size={12} />
               </button>
-              <button className={`lc-btn h-6 gap-1 px-2 ${zoom === 'fit' ? 'text-amber-300' : ''}`} onClick={() => setZoom('fit')} title="Fit to screen">
+              <button className={`lc-btn h-6 gap-1 px-2 ${zoom === 'fit' ? 'text-violet-300' : ''}`} onClick={() => setZoom('fit')} title="Fit to screen">
                 <Maximize2 size={11} /> Fit
               </button>
             </div>
@@ -439,6 +463,17 @@ function Studio({ initial }: { initial: Workspace | null }) {
           </div>
         </aside>
       </div>
+
+      <SizeChartEditor
+        open={sizeChartOpen}
+        garment={garment}
+        color={color}
+        chart={sizeChart}
+        onChange={updateSizeChart}
+        onReset={resetSizeChart}
+        onClose={closeSizeChart}
+        onInfo={onInfo}
+      />
 
       <DraftManager
         open={draftsOpen}
@@ -480,7 +515,7 @@ function Studio({ initial }: { initial: Workspace | null }) {
               t.kind === 'error' ? 'border-red-500/30 bg-red-950/90 text-red-100' : 'border-white/10 bg-zinc-900/95 text-zinc-100'
             }`}
           >
-            {t.kind === 'error' ? <XCircle size={15} className="mt-px shrink-0 text-red-400" /> : <CheckCircle2 size={15} className="mt-px shrink-0 text-amber-400" />}
+            {t.kind === 'error' ? <XCircle size={15} className="mt-px shrink-0 text-red-400" /> : <CheckCircle2 size={15} className="mt-px shrink-0 text-violet-400" />}
             <span className="break-words">{t.msg}</span>
           </div>
         ))}
