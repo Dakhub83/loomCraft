@@ -5,6 +5,7 @@ import {
   AlignRight,
   Bold,
   Crosshair,
+  FileImage,
   ImagePlus,
   Italic,
   Plus,
@@ -43,6 +44,8 @@ interface Props {
   onAutoPlace(v: boolean): void;
   onError(msg: string): void;
   onInfo(msg: string): void;
+  /** Opens the Photoshop import dialog. */
+  onImportPsd(file: File): void;
 }
 
 export function Section({ title, icon, children, right }: { title: string; icon: ReactNode; children: ReactNode; right?: ReactNode }) {
@@ -73,6 +76,7 @@ const DEFAULT_TEXT: TextStyle = {
 
 export function Toolbar(p: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
+  const psdRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [hexDraft, setHexDraft] = useState(p.color);
@@ -105,6 +109,10 @@ export function Toolbar(p: Props) {
     setUploading(true);
     let added = 0;
     for (const file of Array.from(files)) {
+      if (/\.psd$/i.test(file.name) || file.type === 'image/vnd.adobe.photoshop') {
+        p.onImportPsd(file);
+        continue;
+      }
       if (!/^image\/(png|svg\+xml|jpeg|webp)$/.test(file.type) && !/\.(png|svg|jpe?g|webp)$/i.test(file.name)) {
         p.onError(`${file.name}: only PNG, SVG, JPG or WebP files are supported.`);
         continue;
@@ -214,7 +222,7 @@ export function Toolbar(p: Props) {
           ref={fileRef}
           type="file"
           multiple
-          accept=".png,.svg,.jpg,.jpeg,.webp,image/png,image/svg+xml,image/jpeg,image/webp"
+          accept=".png,.svg,.jpg,.jpeg,.webp,.psd,image/png,image/svg+xml,image/jpeg,image/webp"
           className="hidden"
           onChange={(e) => handleFiles(e.target.files)}
         />
@@ -235,8 +243,22 @@ export function Toolbar(p: Props) {
           }`}
         >
           <Upload size={18} className={uploading ? 'animate-pulse text-violet-400' : 'text-zinc-400'} />
-          <span className="text-xs font-medium text-zinc-200">{uploading ? 'Adding…' : 'Upload PNG / SVG'}</span>
+          <span className="text-xs font-medium text-zinc-200">{uploading ? 'Adding…' : 'Upload PNG / SVG / PSD'}</span>
           <span className="text-[11px] text-zinc-500">Multiple files · drag & drop · vectors stay vector</span>
+        </button>
+        <input
+          ref={psdRef}
+          type="file"
+          accept=".psd,image/vnd.adobe.photoshop"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) p.onImportPsd(f);
+            e.target.value = '';
+          }}
+        />
+        <button onClick={() => psdRef.current?.click()} className="lc-btn mt-2 h-8 w-full gap-1.5 text-xs" title="Import layers from a Photoshop project">
+          <FileImage size={13} className="text-violet-400" /> Import Photoshop project (.psd)
         </button>
       </Section>
 

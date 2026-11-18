@@ -28,6 +28,16 @@ The key is read by a small proxy inside the Vite dev/preview server (`server/cla
   - Accessories: Tote, Dad Hat, Beanie
 
   Each garment has its own views (for example Front / Back / Left Leg / Right Leg, or Crown) and print areas sized in inches, and the UI and tech pack follow them.
+- **Photoshop import**: open a `.psd` from **Graphics → Import Photoshop project** (or drop it on the upload box).
+  - Pick layers, and choose which view each top-level group goes to. Groups named Front, Back, Sleeve and so on are matched automatically, and hidden and background or mockup layers start unchecked.
+  - Choose the placement: the canvas is the print area, fit the artwork to the print area, or actual size from the file's ppi.
+  - Text layers stay editable when their font is on Google Fonts. Otherwise, or with **Merge into one image per view**, they come in as pixels.
+- **360° preview** (the **360° View** button on the stage): the garment is shown in 3D with your artwork on it.
+  - Drag to rotate all the way around, scroll to zoom, and press Space to auto-spin.
+  - Jump to Front, Side, Back or Inside.
+  - The **Interior** slider cuts away the half facing you to show the inside of the garment: the reverse of the fabric, ink bleed-through and the neck label.
+  - **Snapshot** saves the current angle as a PNG.
+  - The preview updates live when you change the garment color.
 - **Custom garments**: upload your own front/back flat-lay photos, drag the print area into place, set its real width in inches, and tint the photo with multiply or overlay blending.
 - **Design canvas**: a Fabric.js canvas sits over the safe print zone. It supports drag, corner-scale and rotate, snaps to the center with guides, and has layer ordering, lock/hide, and undo/redo per view.
 - **Assistant drawer** (the Assistant button): a slide-over with three local helpers that need no API key:

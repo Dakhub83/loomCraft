@@ -7,7 +7,7 @@ import { GARMENT_H, GARMENT_W, getGarment, getView, getZone, garmentViews, viewL
 import type { CanvasJSON, GarmentId, ManufacturingSpecs, PrintEffect, PrintZone, SizeChart, SizeCharts, ViewDesigns, ViewEffects, ViewId } from '../types';
 import { chartToCSV, defaultSizeChart, formatMeasure, measureOverlayMarkup, validateChart } from './sizeCharts';
 import { effectFor, hasArtwork } from '../types';
-import { extractPalette, hexToRgb, nearestPantone, normalizeHex } from './color';
+import { extractPalette, hexToRgb, isDark, nearestPantone, normalizeHex } from './color';
 import { ensureFonts } from './fonts';
 import { effectName, ensureFilterInDocument } from './printEffects';
 import { objectKind, objectName } from './fabricHelpers';
@@ -249,6 +249,128 @@ export async function composeMockup(opts: {
     ctx.restore();
   }
   return out;
+}
+
+/* --------------------------------------------------------- 360° turntable textures */
+
+export interface TurntableSide {
+  /** Garment + artwork on a transparent background, as seen from outside. */
+  outside: HTMLCanvasElement;
+  /** Interior fabric: darker shade, faint print bleed-through, neck label on the back. */
+  inside: HTMLCanvasElement;
+}
+
+/**
+ * Textures for the 3D viewer. The front surface is the `front` view (or the first non-back view) plus
+ * the artwork of every view drawn on the same blank (e.g. jogger legs); the back surface is the `back`
+ * view, or a blank copy of the front when the garment has no back view.
+ */
+export async function buildTurntableTextures(
+  s: Pick<StudioSnapshot, 'garment' | 'color' | 'designs' | 'effects'>,
+  scale = 2,
+): Promise<{ front: TurntableSide; back: TurntableSide }> {
+  const views = garmentViews(s.garment);
+  const frontView = views.find((v) => v.id === 'front') ?? views.find((v) => v.id !== 'back') ?? views[0];
+  const backView = views.find((v) => v.id === 'back');
+  const sameBlank = (a: (typeof views)[number], b: (typeof views)[number]) => (!!a.art && a.art === b.art) || (!!a.image && a.image === b.image);
+  const frontArt = views.filter((v) => v.id !== 'back' && sameBlank(v, frontView));
+  const category = getGarment(s.garment).category;
+  const labelled = category === 'tops' || category === 'outerwear';
+
+  const side = async (base: (typeof views)[number], artViews: typeof views, neckLabel: boolean): Promise<TurntableSide> => {
+    const W = Math.round(GARMENT_W * scale);
+    const H = Math.round(GARMENT_H * scale);
+    const mk = () => {
+      const c = document.createElement('canvas');
+      c.width = W;
+      c.height = H;
+      return [c, c.getContext('2d')!] as const;
+    };
+
+    const [garmentC, g] = mk();
+    await drawGarment(g, s.garment, base.id, s.color, W, H);
+
+    const [artC, a] = mk();
+    for (const v of artViews) {
+      const json = s.designs[v.id];
+      if (!json || !hasArtwork(json)) continue;
+      const art = await renderArtwork(json, v.zone, scale);
+      const filter = ensureFilterInDocument(effectFor(s.effects, v.id), scale);
+      a.save();
+      if (filter) a.filter = filter;
+      a.drawImage(art.canvas, v.zone.x * scale, v.zone.y * scale);
+      a.restore();
+    }
+    a.globalCompositeOperation = 'destination-in';
+    a.drawImage(garmentC, 0, 0);
+
+    const [outside, o] = mk();
+    o.drawImage(garmentC, 0, 0);
+    o.drawImage(artC, 0, 0);
+
+    const [inside, i] = mk();
+    i.drawImage(garmentC, 0, 0);
+    i.globalCompositeOperation = 'source-atop';
+    // The reverse of the fabric reads flatter: a little darker on light blanks, a little lighter (unbrushed
+    // grey-ish back) on dark ones, so the interior stays readable either way.
+    i.fillStyle = isDark(s.color) ? 'rgba(255,255,255,0.13)' : 'rgba(8,8,12,0.22)';
+    i.fillRect(0, 0, W, H);
+    // jersey/fleece back: fine diagonal knit lines
+    i.strokeStyle = 'rgba(255,255,255,0.05)';
+    i.lineWidth = Math.max(1, scale * 0.6);
+    i.beginPath();
+    for (let d = -H; d < W; d += 4 * scale) {
+      i.moveTo(d, 0);
+      i.lineTo(d + H, H);
+    }
+    i.stroke();
+    // ink bleed-through (mirrored automatically: the inside is the back face of the same UVs)
+    i.globalAlpha = 0.16;
+    i.drawImage(artC, 0, 0);
+    i.globalAlpha = 1;
+    i.globalCompositeOperation = 'source-over';
+
+    if (neckLabel) {
+      // find the collar at the centre column
+      const col = g.getImageData(Math.round(W / 2), 0, 1, H).data;
+      let top = -1;
+      for (let y = 0; y < H; y++) if (col[y * 4 + 3] > 40) { top = y; break; }
+      if (top >= 0) {
+        const lw = 46 * scale;
+        const lh = 26 * scale;
+        const ly = top + 24 * scale;
+        i.save();
+        i.translate(W / 2, ly);
+        i.scale(-1, 1); // seen from inside the garment, so draw it mirrored
+        i.shadowColor = 'rgba(0,0,0,0.35)';
+        i.shadowBlur = 3 * scale;
+        i.fillStyle = '#EFEBE3';
+        i.fillRect(-lw / 2, 0, lw, lh);
+        i.shadowColor = 'transparent';
+        i.strokeStyle = 'rgba(0,0,0,0.25)';
+        i.setLineDash([2 * scale, 1.5 * scale]);
+        i.lineWidth = 0.7 * scale;
+        i.beginPath();
+        i.moveTo(-lw / 2 + 2 * scale, 2.5 * scale);
+        i.lineTo(lw / 2 - 2 * scale, 2.5 * scale);
+        i.stroke();
+        i.setLineDash([]);
+        i.fillStyle = '#7c3aed';
+        i.textAlign = 'center';
+        i.font = `700 ${7 * scale}px Inter, system-ui, sans-serif`;
+        i.fillText('LOOMCRAFT', 0, 12 * scale);
+        i.fillStyle = '#3f3f46';
+        i.font = `600 ${6 * scale}px Inter, system-ui, sans-serif`;
+        i.fillText('M · 100% COTTON', 0, 20.5 * scale);
+        i.restore();
+      }
+    }
+    return { outside, inside };
+  };
+
+  const front = await side(frontView, frontArt, false);
+  const back = backView ? await side(backView, [backView], labelled) : await side(frontView, [], labelled);
+  return { front, back };
 }
 
 export async function exportMockupPNG(s: StudioSnapshot): Promise<void> {

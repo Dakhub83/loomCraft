@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CheckCircle2, Loader2, Maximize2, Minus, Plus, XCircle } from 'lucide-react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { CheckCircle2, Loader2, Maximize2, Minus, Plus, Rotate3d, XCircle } from 'lucide-react';
 import { Header, LoomCraftLogo } from './components/Header';
 import { Toolbar } from './components/Toolbar';
 import { LayersPanel, PropertiesPanel } from './components/LayersPanel';
@@ -25,6 +25,10 @@ import type { StudioSnapshot } from './utils/exportTools';
 import { refitDesign } from './utils/fabricHelpers';
 import type { PlacementPreset } from './utils/placements';
 import { defaultSizeChart } from './utils/sizeCharts';
+
+// Three.js lives in this chunk; it loads the first time the 360° preview opens.
+const Garment360 = lazy(() => import('./components/Garment360'));
+const PsdImportDialog = lazy(() => import('./components/PsdImportDialog'));
 import {
   deleteCustomGarment,
   deleteDraft,
@@ -86,6 +90,10 @@ function Studio({ initial, initialCustoms }: { initial: Workspace | null; initia
   const [mfgSpecs, setMfgSpecs] = useState<ManufacturingSpecs>(initial?.mfgSpecs ?? {});
   const [sizeChartOpen, setSizeChartOpen] = useState(false);
   const [assistantOpen, setAssistantOpen] = useState(false);
+  const [show360, setShow360] = useState(false);
+  const [psdFile, setPsdFile] = useState<File | null>(null);
+  const closePsd = useCallback(() => setPsdFile(null), []);
+  const close360 = useCallback(() => setShow360(false), []);
 
   const [layers, setLayers] = useState<LayerInfo[]>([]);
   const [selection, setSelection] = useState<SelectionInfo | null>(null);
@@ -505,6 +513,7 @@ function Studio({ initial, initialCustoms }: { initial: Workspace | null; initia
           onAutoPlace={setAutoPlace}
           onError={onError}
           onInfo={onInfo}
+          onImportPsd={setPsdFile}
         />
 
         {/* ---------------- stage ---------------- */}
@@ -548,6 +557,32 @@ function Studio({ initial, initialCustoms }: { initial: Workspace | null; initia
                 </div>
               </div>
             </div>
+
+            {!show360 && (
+              <button
+                onClick={() => {
+                  canvasRef.current?.selectLayers([]);
+                  setShow360(true);
+                }}
+                className="lc-btn absolute right-3 top-3 z-10 h-8 gap-1.5 border-violet-500/40 bg-[#111114]/90 px-3 text-xs text-violet-200 backdrop-blur hover:border-violet-400"
+                title="Rotate the garment in 3D and look inside it"
+              >
+                <Rotate3d size={14} /> 360° View
+              </button>
+            )}
+            {show360 && (
+              <Suspense
+                fallback={
+                  <div className="lc-stage absolute inset-0 z-20 grid place-items-center text-xs text-zinc-400">
+                    <span className="flex items-center gap-2">
+                      <Loader2 size={14} className="animate-spin text-violet-400" /> Loading 3D viewer…
+                    </span>
+                  </div>
+                }
+              >
+                <Garment360 name={name} garment={garment} color={color} designs={designs} effects={effects} onClose={close360} onError={onError} />
+              </Suspense>
+            )}
           </div>
 
           {/* status bar */}
@@ -637,6 +672,12 @@ function Studio({ initial, initialCustoms }: { initial: Workspace | null; initia
         onClose={() => setCustomEditor({ open: false, editing: null })}
         onError={onError}
       />
+
+      {psdFile && (
+        <Suspense fallback={null}>
+          <PsdImportDialog file={psdFile} onClose={closePsd} getContext={() => agentCtx.current!} onInfo={onInfo} onError={onError} />
+        </Suspense>
+      )}
 
       <DraftManager
         open={draftsOpen}
