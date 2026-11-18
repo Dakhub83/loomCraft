@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Copy, FolderOpen, Pencil, Plus, Trash2, X } from 'lucide-react';
 import type { Draft } from '../types';
-import { GARMENTS } from './GarmentTemplates';
+import { getGarment } from '../data/garments';
 
 interface Props {
   open: boolean;
@@ -95,7 +95,7 @@ export function DraftManager({ open, drafts, currentId, onClose, onLoad, onRenam
                 )}
                 <span className="mt-0.5 flex items-center gap-1.5 text-[11px] text-zinc-500">
                   <span className="h-2.5 w-2.5 rounded-full border border-white/20" style={{ background: d.color }} />
-                  {GARMENTS[d.garment]?.short} · {timeAgo(d.updatedAt)}
+                  {getGarment(d.garment).short} · {timeAgo(d.updatedAt)}
                   {d.id === currentId && <span className="font-semibold text-violet-400">· open</span>}
                 </span>
                 <div className="mt-auto flex gap-1 pt-2">

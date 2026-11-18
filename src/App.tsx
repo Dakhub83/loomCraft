@@ -6,10 +6,19 @@ import { LayersPanel, PropertiesPanel } from './components/LayersPanel';
 import { ExportPanel } from './components/ExportPanel';
 import { DraftManager } from './components/DraftManager';
 import { SizeChartEditor } from './components/SizeChartEditor';
+import { ClaudeChat } from './components/AssistantPanel';
+import { AssistantDrawer } from './components/assistant/AssistantDrawer';
+import { LayoutHelper } from './components/assistant/LayoutHelper';
+import { ColorHelper } from './components/assistant/ColorHelper';
+import { SpecHelper } from './components/assistant/SpecHelper';
+import { useStudioAgent } from './ai/useStudioAgent';
+import type { AgentContext } from './ai/executor';
 import { DesignCanvas, type DesignCanvasHandle, type HistoryState } from './components/DesignCanvas';
-import { GARMENT_H, GARMENT_W, GARMENTS, GarmentSVG, getZone } from './components/GarmentTemplates';
-import type { CanvasJSON, Draft, GarmentId, LayerInfo, PrintEffect, SelectionInfo, SizeChart, SizeCharts, ViewId, Workspace } from './types';
-import { VIEWS, defaultEffects, emptyDesigns, hasArtwork } from './types';
+import { GarmentSVG } from './components/GarmentTemplates';
+import { CustomGarmentEditor } from './components/CustomGarmentEditor';
+import { DEFAULT_GARMENT, GARMENT_H, GARMENT_W, garmentViews, getGarment, getZone, hasGarment, hasView, setCustomGarments, viewLabel } from './data/garments';
+import type { CanvasJSON, CustomGarmentRecord, Draft, GarmentId, LayerInfo, ManufacturingSpec, ManufacturingSpecs, PrintEffect, SelectionInfo, SizeChart, SizeCharts, ViewId, Workspace } from './types';
+import { defaultEffects, effectFor, emptyDesigns, hasArtwork } from './types';
 import { isDark } from './utils/color';
 import { effectName, filterMarkup } from './utils/printEffects';
 import type { StudioSnapshot } from './utils/exportTools';
@@ -17,8 +26,11 @@ import { refitDesign } from './utils/fabricHelpers';
 import type { PlacementPreset } from './utils/placements';
 import { defaultSizeChart } from './utils/sizeCharts';
 import {
+  deleteCustomGarment,
   deleteDraft,
   duplicateDraft,
+  listCustomGarments,
+  saveCustomGarment,
   listDrafts,
   loadWorkspace,
   newDraftId,
@@ -38,14 +50,16 @@ const DEFAULT_COLOR = '#141416';
 
 /** Loads the autosaved workspace from IndexedDB before mounting the studio. */
 export default function App() {
-  const [initial, setInitial] = useState<Workspace | null | undefined>(undefined);
+  const [boot, setBoot] = useState<{ ws: Workspace | null; customs: CustomGarmentRecord[] } | undefined>(undefined);
   useEffect(() => {
-    loadWorkspace()
-      .then(setInitial)
-      .catch(() => setInitial(null));
+    Promise.all([loadWorkspace().catch(() => null), listCustomGarments().catch(() => [])]).then(([ws, customs]) => {
+      // Custom blanks must be in the registry before the studio resolves garment ids.
+      setCustomGarments(customs);
+      setBoot({ ws, customs });
+    });
   }, []);
 
-  if (initial === undefined) {
+  if (boot === undefined) {
     return (
       <div className="flex h-screen flex-col items-center justify-center gap-4 bg-[#0a0a0c]">
         <LoomCraftLogo size={40} />
@@ -53,19 +67,25 @@ export default function App() {
       </div>
     );
   }
-  return <Studio initial={initial} />;
+  return <Studio initial={boot.ws} initialCustoms={boot.customs} />;
 }
 
-function Studio({ initial }: { initial: Workspace | null }) {
+const firstView = (g: GarmentId) => garmentViews(g)[0].id;
+
+function Studio({ initial, initialCustoms }: { initial: Workspace | null; initialCustoms: CustomGarmentRecord[] }) {
   const [name, setName] = useState(initial?.name ?? DEFAULT_NAME);
   const [draftId, setDraftId] = useState<string | null>(initial?.draftId ?? null);
-  const [garment, setGarment] = useState<GarmentId>(initial?.garment ?? 'tee');
+  const [garment, setGarment] = useState<GarmentId>(initial?.garment && hasGarment(initial.garment) ? initial.garment : DEFAULT_GARMENT);
   const [color, setColor] = useState(initial?.color ?? DEFAULT_COLOR);
   const [designs, setDesigns] = useState(initial?.designs ?? emptyDesigns());
   const [effects, setEffects] = useState(initial?.effects ?? defaultEffects());
-  const [view, setView] = useState<ViewId>('front');
+  const [view, setView] = useState<ViewId>(() => firstView(initial?.garment && hasGarment(initial.garment) ? initial.garment : DEFAULT_GARMENT));
+  const [customList, setCustomList] = useState<CustomGarmentRecord[]>(initialCustoms);
+  const [customEditor, setCustomEditor] = useState<{ open: boolean; editing: CustomGarmentRecord | null }>({ open: false, editing: null });
   const [sizeCharts, setSizeCharts] = useState<SizeCharts>(initial?.sizeCharts ?? {});
+  const [mfgSpecs, setMfgSpecs] = useState<ManufacturingSpecs>(initial?.mfgSpecs ?? {});
   const [sizeChartOpen, setSizeChartOpen] = useState(false);
+  const [assistantOpen, setAssistantOpen] = useState(false);
 
   const [layers, setLayers] = useState<LayerInfo[]>([]);
   const [selection, setSelection] = useState<SelectionInfo | null>(null);
@@ -86,8 +106,9 @@ function Studio({ initial }: { initial: Workspace | null }) {
   const histories = useRef(new Map<string, HistoryState>());
   const stageRef = useRef<HTMLDivElement>(null);
   const pendingPlacement = useRef<PlacementPreset | null>(null);
+  const canvasWaiters = useRef<Array<() => void>>([]);
 
-  const state = { name, draftId, garment, color, view, designs, effects, sizeCharts };
+  const state = { name, draftId, garment, color, view, designs, effects, sizeCharts, mfgSpecs };
   const stateRef = useRef(state);
   stateRef.current = state;
 
@@ -122,9 +143,9 @@ function Studio({ initial }: { initial: Workspace | null }) {
 
   /* ---------------- autosave workspace (IndexedDB, off the input path) ---------------- */
   useEffect(() => {
-    const t = setTimeout(() => void saveWorkspace({ draftId, name, garment, color, designs, effects, sizeCharts }), 600);
+    const t = setTimeout(() => void saveWorkspace({ draftId, name, garment, color, designs, effects, sizeCharts, mfgSpecs }), 600);
     return () => clearTimeout(t);
-  }, [draftId, name, garment, color, designs, effects, sizeCharts]);
+  }, [draftId, name, garment, color, designs, effects, sizeCharts, mfgSpecs]);
 
   /* ---------------- stage fit ---------------- */
   useEffect(() => {
@@ -156,6 +177,9 @@ function Studio({ initial }: { initial: Workspace | null }) {
 
   const handleCanvasReady = useCallback(
     (v: ViewId) => {
+      const waiters = canvasWaiters.current;
+      canvasWaiters.current = [];
+      waiters.forEach((resolve) => resolve());
       const pl = pendingPlacement.current;
       if (pl && pl.view === v) {
         pendingPlacement.current = null;
@@ -166,6 +190,10 @@ function Studio({ initial }: { initial: Workspace | null }) {
   );
 
   const handlePlacement = (pl: PlacementPreset) => {
+    if (!hasView(garment, pl.view)) {
+      toast('error', `The ${getGarment(garment).name} has no ${pl.view} view for ${pl.name}.`);
+      return;
+    }
     if (pl.view !== view) {
       // Switch views first; the preset is applied once the new canvas has loaded.
       pendingPlacement.current = pl;
@@ -175,17 +203,45 @@ function Studio({ initial }: { initial: Workspace | null }) {
   };
 
   /* ---------------- studio actions ---------------- */
-  const changeGarment = (g: GarmentId) => {
-    if (g === garment) return;
+  const changeGarment = (g: GarmentId, fromZones?: Record<ViewId, { w: number; h: number }>) => {
+    if (g === garment && !fromZones) return;
     const next = { ...designs };
-    for (const v of VIEWS) {
-      const json = designs[v];
-      if (json) next[v] = refitDesign(json, getZone(garment, v), getZone(g, v));
+    // Artwork on views both garments share is refitted to the new print zones. Views the new garment
+    // lacks are kept untouched, so switching back restores them.
+    for (const v of garmentViews(g)) {
+      const json = designs[v.id];
+      const from = fromZones?.[v.id] ?? (hasView(garment, v.id) ? getZone(garment, v.id) : null);
+      if (json && from) next[v.id] = refitDesign(json, from, v.zone);
     }
     setDesigns(next);
     setGarment(g);
+    if (!hasView(g, view)) setView(firstView(g));
     setDirty(true);
     resetCanvases();
+  };
+
+  /* ---------------- custom blanks ---------------- */
+  const saveCustom = async (rec: CustomGarmentRecord) => {
+    try {
+      const editingCurrent = rec.id === garment && hasGarment(rec.id);
+      // Remember the old print zones so artwork can be refitted if the box moved.
+      const oldZones = editingCurrent ? Object.fromEntries(garmentViews(rec.id).map((v) => [v.id, v.zone])) : undefined;
+      const list = await saveCustomGarment(rec);
+      setCustomGarments(list);
+      setCustomList(list);
+      setCustomEditor({ open: false, editing: null });
+      changeGarment(rec.id, oldZones);
+      toast('info', `${customEditor.editing ? 'Updated' : 'Added'} “${rec.name}”`);
+    } catch (e) {
+      toast('error', `Couldn't save the custom garment: ${(e as Error).message}`);
+    }
+  };
+
+  const deleteCustom = async (id: GarmentId) => {
+    const list = await deleteCustomGarment(id);
+    if (garment === id) changeGarment(DEFAULT_GARMENT);
+    setCustomGarments(list);
+    setCustomList(list);
   };
 
   const changeView = (v: ViewId) => {
@@ -215,6 +271,62 @@ function Studio({ initial }: { initial: Workspace | null }) {
   }, [garment]);
   const closeSizeChart = useCallback(() => setSizeChartOpen(false), []);
 
+  /* ---------------- manufacturing spec (one per garment) ---------------- */
+  const updateSpec = useCallback(
+    (spec: ManufacturingSpec | null) => {
+      setMfgSpecs((all) => {
+        const next = { ...all };
+        if (spec) next[garment] = spec;
+        else delete next[garment];
+        return next;
+      });
+      setDirty(true);
+    },
+    [garment],
+  );
+
+  /* ---------------- Claude design assistant ---------------- */
+  /** Resolves when the next canvas (after a garment/view switch) has mounted and loaded its design. */
+  const waitForCanvas = () =>
+    new Promise<void>((resolve) => {
+      canvasWaiters.current.push(resolve);
+      setTimeout(resolve, 6000);
+    });
+  const agentCtx = useRef<AgentContext | null>(null);
+  agentCtx.current = {
+    canvas: () => canvasRef.current,
+    state: () => stateRef.current,
+    setGarment: async (g) => {
+      if (g === stateRef.current.garment) return;
+      const ready = waitForCanvas();
+      changeGarment(g);
+      await ready;
+    },
+    setView: async (v) => {
+      if (v === stateRef.current.view) return;
+      const ready = waitForCanvas();
+      setSelection(null);
+      setView(v);
+      await ready;
+    },
+    setColor: (hex) => {
+      setColor(hex);
+      setDirty(true);
+    },
+    setEffect: (e) => {
+      setEffects((x) => ({ ...x, [stateRef.current.view]: e }));
+      setDirty(true);
+    },
+    mockupJpeg: async () => {
+      const { composeMockup } = await import('./utils/exportTools');
+      const s = stateRef.current;
+      const c = await composeMockup({ garment: s.garment, view: s.view, color: s.color, json: s.designs[s.view], effect: effectFor(s.effects, s.view), scale: 2 });
+      return c.toDataURL('image/jpeg', 0.85).split(',')[1];
+    },
+  };
+  const agent = useStudioAgent(() => agentCtx.current!);
+  const closeAssistant = useCallback(() => setAssistantOpen(false), []);
+
   /* ---------------- drafts ---------------- */
   const getSnapshot = useCallback((): StudioSnapshot => ({ ...stateRef.current }), []);
 
@@ -238,6 +350,7 @@ function Studio({ initial }: { initial: Workspace | null }) {
           designs: s.designs,
           effects: s.effects,
           sizeCharts: s.sizeCharts,
+          mfgSpecs: s.mfgSpecs,
           thumbnail,
           createdAt: existing?.createdAt ?? now,
           updatedAt: now,
@@ -259,14 +372,17 @@ function Studio({ initial }: { initial: Workspace | null }) {
 
   const loadDraft = (d: Draft) => {
     if (d.id !== draftId && !confirmDiscard()) return;
+    const g = hasGarment(d.garment) ? d.garment : DEFAULT_GARMENT;
+    if (g !== d.garment) toast('error', `This draft used a custom garment that no longer exists, so it opened on the ${getGarment(g).name}.`);
     setName(d.name);
     setDraftId(d.id);
-    setGarment(d.garment);
+    setGarment(g);
     setColor(d.color);
     setDesigns({ ...emptyDesigns(), ...d.designs });
     setEffects({ ...defaultEffects(), ...d.effects });
     setSizeCharts(d.sizeCharts ?? {});
-    setView('front');
+    setMfgSpecs(d.mfgSpecs ?? {});
+    setView(firstView(g));
     setDirty(false);
     setSavedAt(d.updatedAt);
     resetCanvases();
@@ -281,7 +397,8 @@ function Studio({ initial }: { initial: Workspace | null }) {
     setDesigns(emptyDesigns());
     setEffects(defaultEffects());
     setSizeCharts({});
-    setView('front');
+    setMfgSpecs({});
+    setView(firstView(garment));
     setDirty(false);
     setSavedAt(null);
     resetCanvases();
@@ -312,11 +429,13 @@ function Studio({ initial }: { initial: Workspace | null }) {
 
   /* ---------------- derived ---------------- */
   const zone = getZone(garment, view);
-  const viewsWithArtList = useMemo(() => VIEWS.filter((v) => hasArtwork(designs[v])), [designs]);
-  const viewsWithArt = useMemo(
-    () => ({ front: viewsWithArtList.includes('front'), back: viewsWithArtList.includes('back'), sleeve: viewsWithArtList.includes('sleeve') }),
-    [viewsWithArtList],
+  const viewsWithArtList = useMemo(
+    () => garmentViews(garment).map((v) => v.id).filter((v) => hasArtwork(designs[v])),
+    // customList: a custom garment's views can change when it's edited
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [designs, garment, customList],
   );
+  const viewsWithArt = useMemo(() => Object.fromEntries(viewsWithArtList.map((v) => [v, true])), [viewsWithArtList]);
   const zoneLineColor = isDark(color) ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)';
   const savedLabel = saving
     ? 'Saving…'
@@ -357,6 +476,8 @@ function Studio({ initial }: { initial: Workspace | null }) {
         }}
         draftCount={drafts.length}
         onOpenSizeChart={() => setSizeChartOpen(true)}
+        assistantOpen={assistantOpen}
+        onToggleAssistant={() => setAssistantOpen((o) => !o)}
       />
 
       <div className="flex min-h-0 flex-1">
@@ -371,8 +492,12 @@ function Studio({ initial }: { initial: Workspace | null }) {
           view={view}
           onView={changeView}
           viewsWithArt={viewsWithArt}
-          effect={effects[view]}
+          effect={effectFor(effects, view)}
           onEffect={changeEffect}
+          customGarments={customList}
+          onAddCustom={() => setCustomEditor({ open: true, editing: null })}
+          onEditCustom={(id) => setCustomEditor({ open: true, editing: customList.find((c) => c.id === id) ?? null })}
+          onDeleteCustom={deleteCustom}
           selection={selection}
           canvas={canvasRef}
           onPlacement={handlePlacement}
@@ -410,9 +535,9 @@ function Studio({ initial }: { initial: Workspace | null }) {
                     ref={canvasRef}
                     view={view}
                     zone={zone}
-                    initialJSON={designs[view]}
+                    initialJSON={designs[view] ?? null}
                     history={historyFor(view)}
-                    effect={effects[view]}
+                    effect={effectFor(effects, view)}
                     onChange={handleCanvasChange}
                     onLayers={setLayers}
                     onSelection={setSelection}
@@ -428,7 +553,7 @@ function Studio({ initial }: { initial: Workspace | null }) {
           {/* status bar */}
           <div className="flex h-10 shrink-0 items-center gap-4 border-t border-white/[0.06] bg-[#0d0d10] px-4 text-[11px] text-zinc-500">
             <span className="truncate whitespace-nowrap">
-              <span className="text-zinc-300">{GARMENTS[garment].name}</span> · {view} · {effectName(effects[view])}
+              <span className="text-zinc-300">{getGarment(garment).name}</span> · {viewLabel(garment, view)} · {effectName(effectFor(effects, view))}
             </span>
             <label className="flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap">
               <input type="checkbox" checked={showZone} onChange={(e) => setShowZone(e.target.checked)} className="accent-violet-500" />
@@ -464,15 +589,53 @@ function Studio({ initial }: { initial: Workspace | null }) {
         </aside>
       </div>
 
+      <AssistantDrawer
+        open={assistantOpen}
+        onClose={closeAssistant}
+        render={(tab) => {
+          switch (tab) {
+            case 'layouts':
+              return <LayoutHelper garment={garment} hasSelection={!!selection} getContext={() => agentCtx.current!} onInfo={onInfo} onError={onError} />;
+            case 'colors':
+              return <ColorHelper garmentColor={color} canvas={canvasRef} hasSelection={!!selection} designVersion={designs[view]} onInfo={onInfo} onError={onError} />;
+            case 'specs':
+              return (
+                <SpecHelper
+                  garment={garment}
+                  color={color}
+                  designs={designs}
+                  effects={effects}
+                  spec={mfgSpecs[garment]}
+                  onChange={updateSpec}
+                  onOpenSizeChart={() => setSizeChartOpen(true)}
+                  onInfo={onInfo}
+                />
+              );
+            default:
+              return <ClaudeChat active={assistantOpen} history={agent.history} status={agent.status} onSend={agent.send} onStop={agent.stop} onReset={agent.reset} />;
+          }
+        }}
+      />
+
       <SizeChartEditor
         open={sizeChartOpen}
         garment={garment}
         color={color}
         chart={sizeChart}
+        spec={mfgSpecs[garment]}
         onChange={updateSizeChart}
         onReset={resetSizeChart}
         onClose={closeSizeChart}
         onInfo={onInfo}
+      />
+
+      <CustomGarmentEditor
+        open={customEditor.open}
+        initial={customEditor.editing}
+        color={color}
+        onSave={saveCustom}
+        onClose={() => setCustomEditor({ open: false, editing: null })}
+        onError={onError}
       />
 
       <DraftManager

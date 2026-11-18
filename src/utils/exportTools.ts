@@ -2,10 +2,11 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { StaticCanvas, type FabricObject } from 'fabric';
 import { jsPDF } from 'jspdf';
-import { GARMENT_H, GARMENT_W, GARMENTS, GarmentSVG, getZone, zonePpi } from '../components/GarmentTemplates';
-import type { CanvasJSON, GarmentId, PrintEffect, PrintZone, SizeChart, SizeCharts, ViewDesigns, ViewEffects, ViewId } from '../types';
+import { GarmentSVG } from '../components/GarmentTemplates';
+import { GARMENT_H, GARMENT_W, getGarment, getView, getZone, garmentViews, viewLabel, zonePpi } from '../data/garments';
+import type { CanvasJSON, GarmentId, ManufacturingSpecs, PrintEffect, PrintZone, SizeChart, SizeCharts, ViewDesigns, ViewEffects, ViewId } from '../types';
 import { chartToCSV, defaultSizeChart, formatMeasure, measureOverlayMarkup, validateChart } from './sizeCharts';
-import { VIEWS, hasArtwork } from '../types';
+import { effectFor, hasArtwork } from '../types';
 import { extractPalette, hexToRgb, nearestPantone, normalizeHex } from './color';
 import { ensureFonts } from './fonts';
 import { effectName, ensureFilterInDocument } from './printEffects';
@@ -20,6 +21,7 @@ export interface StudioSnapshot {
   designs: ViewDesigns;
   effects: ViewEffects;
   sizeCharts?: SizeCharts;
+  mfgSpecs?: ManufacturingSpecs;
 }
 
 const PRINT_DPI = 300;
@@ -51,6 +53,48 @@ export { hasArtwork };
 
 export function garmentMarkup(garment: GarmentId, view: ViewId, color: string, uid = 'lcx'): string {
   return renderToStaticMarkup(createElement(GarmentSVG, { garment, view, color, uid }));
+}
+
+async function loadImage(src: string): Promise<HTMLImageElement> {
+  const img = new Image();
+  img.decoding = 'async';
+  img.src = src;
+  await img.decode();
+  return img;
+}
+
+/**
+ * Draws a garment view into a 2D context. Vector blanks are rasterized from their SVG; custom photo
+ * blanks are fitted (contain), tinted with the canvas `multiply`/`overlay` composite op and then
+ * masked back to the photo's alpha – the same result as the studio's CSS blend preview.
+ */
+export async function drawGarment(ctx: CanvasRenderingContext2D, garment: GarmentId, view: ViewId, color: string, w: number, h: number) {
+  const v = getView(garment, view);
+  if (v.art) {
+    ctx.drawImage(await svgToImage(garmentMarkup(garment, view, color, `lcx-${view}`)), 0, 0, w, h);
+    return;
+  }
+  if (!v.image) return;
+  const img = await loadImage(v.image);
+  const s = Math.min(w / img.naturalWidth, h / img.naturalHeight);
+  const dw = img.naturalWidth * s;
+  const dh = img.naturalHeight * s;
+  const dx = (w - dw) / 2;
+  const dy = (h - dh) / 2;
+  const tint = getGarment(garment).custom?.tint ?? 'multiply';
+  const off = document.createElement('canvas');
+  off.width = w;
+  off.height = h;
+  const o = off.getContext('2d')!;
+  o.drawImage(img, dx, dy, dw, dh);
+  if (tint !== 'none') {
+    o.globalCompositeOperation = tint;
+    o.fillStyle = color;
+    o.fillRect(0, 0, w, h);
+    o.globalCompositeOperation = 'destination-in';
+    o.drawImage(img, dx, dy, dw, dh);
+  }
+  ctx.drawImage(off, 0, 0);
 }
 
 async function svgToImage(markup: string): Promise<HTMLImageElement> {
@@ -167,7 +211,7 @@ export async function composeMockup(opts: {
   garment: GarmentId;
   view: ViewId;
   color: string;
-  json: CanvasJSON | null;
+  json: CanvasJSON | null | undefined;
   effect: PrintEffect;
   scale: number;
   watermark?: boolean;
@@ -184,8 +228,7 @@ export async function composeMockup(opts: {
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, out.width, out.height);
 
-  const garmentImg = await svgToImage(garmentMarkup(garment, view, color, `lcx-${view}`));
-  ctx.drawImage(garmentImg, 0, 0, out.width, out.height);
+  await drawGarment(ctx, garment, view, color, out.width, out.height);
 
   if (json && hasArtwork(json)) {
     const zone = getZone(garment, view);
@@ -214,7 +257,7 @@ export async function exportMockupPNG(s: StudioSnapshot): Promise<void> {
     view: s.view,
     color: s.color,
     json: s.designs[s.view],
-    effect: s.effects[s.view],
+    effect: effectFor(s.effects, s.view),
     scale: MOCKUP_SCALE,
     watermark: true,
   });
@@ -223,13 +266,14 @@ export async function exportMockupPNG(s: StudioSnapshot): Promise<void> {
 
 /** Small JPEG preview for the draft manager. */
 export async function makeThumbnail(s: Omit<StudioSnapshot, 'view' | 'name' | 'draftId'>): Promise<string> {
-  const view = VIEWS.find((v) => hasArtwork(s.designs[v])) ?? 'front';
+  const views = garmentViews(s.garment).map((v) => v.id);
+  const view = views.find((v) => hasArtwork(s.designs[v])) ?? views[0];
   const c = await composeMockup({
     garment: s.garment,
     view,
     color: s.color,
     json: s.designs[view],
-    effect: s.effects[view],
+    effect: effectFor(s.effects, view),
     scale: 0.4,
   });
   return c.toDataURL('image/jpeg', 0.75);
@@ -298,19 +342,20 @@ function downscaleToJpeg(src: HTMLCanvasElement, width: number, quality = 0.9): 
 
 /** Garment front + measurement lines, rasterized for the PDF size-spec page. */
 async function renderSpecDiagram(garment: GarmentId, color: string, chart: SizeChart): Promise<string> {
-  const markup =
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${GARMENT_W} ${GARMENT_H}" width="${GARMENT_W}" height="${GARMENT_H}">` +
-    garmentMarkup(garment, 'front', color, 'lcspec') +
-    measureOverlayMarkup(garment, chart.points, { color: '#7c3aed' }) +
-    '</svg>';
-  const img = await svgToImage(markup);
   const c = document.createElement('canvas');
   c.width = GARMENT_W * 2;
   c.height = GARMENT_H * 2;
   const ctx = c.getContext('2d')!;
   ctx.fillStyle = '#f6f6f4';
   ctx.fillRect(0, 0, c.width, c.height);
-  ctx.drawImage(img, 0, 0, c.width, c.height);
+  await drawGarment(ctx, garment, garmentViews(garment)[0].id, color, c.width, c.height);
+  const lines = measureOverlayMarkup(garment, chart.points, { color: '#7c3aed' });
+  if (lines) {
+    const overlay = await svgToImage(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${GARMENT_W} ${GARMENT_H}" width="${GARMENT_W}" height="${GARMENT_H}">${lines}</svg>`,
+    );
+    ctx.drawImage(overlay, 0, 0, c.width, c.height);
+  }
   return c.toDataURL('image/jpeg', 0.9);
 }
 
@@ -327,7 +372,8 @@ export async function exportProductionZip(
   s: StudioSnapshot,
   onProgress?: (msg: string) => void,
 ): Promise<{ filename: string; files: string[] }> {
-  const artViews = VIEWS.filter((v) => hasArtwork(s.designs[v]));
+  const allViews = garmentViews(s.garment).map((v) => v.id);
+  const artViews = allViews.filter((v) => hasArtwork(s.designs[v]));
   if (!artViews.length) throw new Error('Add artwork to at least one view before exporting a production pack.');
 
   const { default: JSZip } = await import('jszip');
@@ -335,7 +381,9 @@ export async function exportProductionZip(
   const slug = slugify(s.name);
   const reports: ViewReport[] = [];
   const files: string[] = [];
-  const mockupViews = VIEWS.filter((v) => v !== 'sleeve' || artViews.includes(v));
+  // Front and back always (when the garment has them), plus every other view that carries artwork.
+  const mockupViews = allViews.filter((v) => v === 'front' || v === 'back' || artViews.includes(v));
+  if (!mockupViews.length) mockupViews.push(allViews[0]);
   const mockupCanvases = new Map<ViewId, HTMLCanvasElement>();
 
   for (const view of mockupViews) {
@@ -346,7 +394,7 @@ export async function exportProductionZip(
       view,
       color: s.color,
       json: s.designs[view],
-      effect: s.effects[view],
+      effect: effectFor(s.effects, view),
       scale: MOCKUP_SCALE,
       watermark: true,
     });
@@ -375,7 +423,7 @@ export async function exportProductionZip(
     reports.push({
       view,
       zone,
-      effect: s.effects[view],
+      effect: effectFor(s.effects, view),
       boundsIn: {
         w: b.width / ppi,
         h: b.height / ppi,
@@ -392,7 +440,7 @@ export async function exportProductionZip(
 
   const chart = s.sizeCharts?.[s.garment] ?? defaultSizeChart(s.garment);
   const csvName = `specs/${slug}-size-chart.csv`;
-  zip.file(csvName, chartToCSV(chart, GARMENTS[s.garment].name), { compression: 'DEFLATE' });
+  zip.file(csvName, chartToCSV(chart, getGarment(s.garment).name, s.mfgSpecs?.[s.garment]), { compression: 'DEFLATE' });
   files.push(csvName);
 
   onProgress?.('Building tech pack PDF…');
@@ -426,7 +474,16 @@ function buildTechPack(s: StudioSnapshot, reports: ViewReport[], spec: { chart: 
   // jsPDF's built-in Helvetica only covers a limited charset – normalize typographic symbols to ASCII.
   const ascii = (t: string) =>
     t
-      .replace(/[·•]/g, '/')
+      .replace(/·/g, '/')
+      .replace(/•/g, '-')
+      .replace(/\s?°\s?/g, ' deg ')
+      .replace(/²/g, '2')
+      .replace(/µ/g, 'u')
+      .replace(/½/g, '1/2')
+      .replace(/¾/g, '3/4')
+      .replace(/¼/g, '1/4')
+      .replace(/⚠/g, '(!)')
+      .replace(/→/g, '->')
       .replace(/×/g, 'x')
       .replace(/[–—]/g, '-')
       .replace(/…/g, '...')
@@ -439,7 +496,7 @@ function buildTechPack(s: StudioSnapshot, reports: ViewReport[], spec: { chart: 
     rawText(Array.isArray(t) ? t.map(ascii) : ascii(t), ...rest);
   const W = 612;
   const M = 36;
-  const garment = GARMENTS[s.garment];
+  const garment = getGarment(s.garment);
   const now = new Date();
   const dateStr = now.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
   const styleNo = s.draftId ? `LC-${s.draftId.slice(-6).toUpperCase()}` : 'LC-UNSAVED';
@@ -459,7 +516,10 @@ function buildTechPack(s: StudioSnapshot, reports: ViewReport[], spec: { chart: 
     doc.roundedRect(x, y, size, size, 2, 2, 'FD');
   };
 
-  const pageCount = spec ? 2 : 1;
+  const mfg = s.mfgSpecs?.[s.garment];
+  const mfgPage = mfg ? 2 : 0;
+  const sizePage = spec ? (mfg ? 3 : 2) : 0;
+  const pageCount = 1 + (mfg ? 1 : 0) + (spec ? 1 : 0);
 
   const drawHeader = (title: string) => {
     doc.setFillColor(20, 20, 24);
@@ -516,7 +576,7 @@ function buildTechPack(s: StudioSnapshot, reports: ViewReport[], spec: { chart: 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
   setText(MUTED);
-  doc.text(`${garment.name}  —  ${garment.spec}`, M, y + 14);
+  doc.text(`${garment.name}  —  ${mfg ? `${mfg.fabricWeight} · ${mfg.composition}` : garment.spec}`.split('\n')[0].slice(0, 120), M, y + 14);
 
   const bodyPantone = nearestPantone(s.color);
   swatch(s.color, W - M - 150, y - 16, 26);
@@ -540,17 +600,20 @@ function buildTechPack(s: StudioSnapshot, reports: ViewReport[], spec: { chart: 
   doc.addImage(primary.mockup, 'JPEG', colL, y, colLW, imgH);
   doc.setDrawColor(LINE[0], LINE[1], LINE[2]);
   doc.rect(colL, y, colLW, imgH);
-  label(`${primary.view} view`, colL + 6, y + imgH - 6);
+  label(`${viewLabel(s.garment, primary.view)} view`, colL + 6, y + imgH - 6);
 
   const others = reports.filter((r) => r !== primary);
-  const thumbW = (colLW - 8) / 2;
-  others.forEach((r, i) => {
+  // Up to 3 thumbnails in a single row (garments like joggers have 4 views).
+  const shownOthers = others.slice(0, 3);
+  const thumbCols = Math.max(2, shownOthers.length);
+  const thumbW = (colLW - 8 * (thumbCols - 1)) / thumbCols;
+  shownOthers.forEach((r, i) => {
     const tx = colL + i * (thumbW + 8);
     const ty = y + imgH + 8;
     const th = thumbW * (GARMENT_H / GARMENT_W);
     doc.addImage(r.mockup, 'JPEG', tx, ty, thumbW, th);
     doc.rect(tx, ty, thumbW, th);
-    label(r.view, tx + 5, ty + th - 5);
+    label(viewLabel(s.garment, r.view), tx + 5, ty + th - 5);
   });
 
   /* right column: placements */
@@ -566,7 +629,7 @@ function buildTechPack(s: StudioSnapshot, reports: ViewReport[], spec: { chart: 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
     setText(INK);
-    doc.text(`${r.view.toUpperCase()}`, colR + 8, ry);
+    doc.text(viewLabel(s.garment, r.view).toUpperCase(), colR + 8, ry);
     setText(ACCENT);
     doc.text(effectName(r.effect), colR + colRW - 8, ry, { align: 'right' });
 
@@ -637,7 +700,7 @@ function buildTechPack(s: StudioSnapshot, reports: ViewReport[], spec: { chart: 
   setText(INK);
   allRows.slice(0, maxRows).forEach((l) => {
     ty += 11;
-    doc.text(l.view, cols[0], ty);
+    doc.text(viewLabel(s.garment, l.view), cols[0], ty);
     doc.text((doc.splitTextToSize(l.name, 150) as string[])[0], cols[1], ty);
     doc.text(l.kind, cols[2], ty);
     doc.text(`${fmt(l.widthIn)} × ${fmt(l.heightIn)}`, cols[3], ty);
@@ -658,6 +721,65 @@ function buildTechPack(s: StudioSnapshot, reports: ViewReport[], spec: { chart: 
   doc.text(doc.splitTextToSize(note, W - 2 * M) as string[], M, footerTop - 14);
 
   drawFooter(1);
+
+  /* ---------------- manufacturing spec page ---------------- */
+  if (mfg) {
+    doc.addPage('letter', 'portrait');
+    drawHeader('MFG SPEC');
+    let my = 92;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    setText(INK);
+    doc.text('Manufacturing Specification', M, my);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    setText(MUTED);
+    doc.text(`${garment.name}  -  garment color ${normalizeHex(s.color)} / ${nearestPantone(s.color).name}`, M, my + 14);
+    my += 30;
+    doc.setDrawColor(LINE[0], LINE[1], LINE[2]);
+    doc.line(M, my, W - M, my);
+    my += 16;
+
+    const colW = (W - 2 * M - 24) / 2;
+    const block = (title: string, body: string, x: number, y0: number, width: number, maxY: number): number => {
+      label(title, x, y0);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      setText(INK);
+      let yy = y0 + 12;
+      for (const para of body.split('\n')) {
+        const wrapped = doc.splitTextToSize(para || ' ', width) as string[];
+        for (const ln of wrapped) {
+          if (yy > maxY) return yy;
+          doc.text(ln, x, yy);
+          yy += 11;
+        }
+      }
+      return yy + 10;
+    };
+
+    const footerLimit = 742 - 20;
+    // left column: fabric, construction, trims, care
+    doc.setFillColor(246, 244, 252);
+    doc.roundedRect(M, my - 4, colW, 58, 4, 4, 'F');
+    label('Fabric weight', M + 10, my + 10);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    setText(INK);
+    doc.text((doc.splitTextToSize(mfg.fabricWeight, colW - 20) as string[])[0], M + 10, my + 24);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    setText(MUTED);
+    doc.text((doc.splitTextToSize(mfg.composition, colW - 20) as string[]).slice(0, 2), M + 10, my + 37);
+    let ly = my + 72;
+    ly = block('Construction', mfg.construction, M, ly, colW, footerLimit);
+    ly = block('Trims & labels', mfg.trims, M, ly, colW, footerLimit);
+    block('Care', mfg.care, M, ly, colW, footerLimit);
+
+    // right column: factory print notes
+    block('Factory print notes', mfg.printNotes, M + colW + 24, my + 6, colW, footerLimit);
+    drawFooter(mfgPage);
+  }
 
   /* ---------------- page 2: size specification ---------------- */
   if (spec) {
@@ -779,7 +901,7 @@ function buildTechPack(s: StudioSnapshot, reports: ViewReport[], spec: { chart: 
       (issues.some((i) => i.kind !== 'off-grade') ? 'Values in red break the grade progression and need review. ' : '') +
       'Approve a fit sample in the base size before grading production.';
     doc.text(doc.splitTextToSize(specNote, W - 2 * M) as string[], M, ny);
-    drawFooter(2);
+    drawFooter(sizePage);
   }
 
   return doc;

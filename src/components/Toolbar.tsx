@@ -8,15 +8,14 @@ import {
   ImagePlus,
   Italic,
   Plus,
-  Shirt,
   Sparkles,
   Type,
   Underline,
   Upload,
 } from 'lucide-react';
-import type { GarmentId, PrintEffect, SelectionInfo, ViewId } from '../types';
-import { VIEWS } from '../types';
-import { GARMENT_LIST, GarmentSVG, getZone } from './GarmentTemplates';
+import type { CustomGarmentRecord, GarmentId, PrintEffect, SelectionInfo, ViewId } from '../types';
+import { garmentViews, getZone, hasView, viewLabel } from '../data/garments';
+import { GarmentPicker } from './GarmentPicker';
 import type { DesignCanvasHandle, TextStyle } from './DesignCanvas';
 import { GARMENT_SWATCHES, nearestPantone, normalizeHex } from '../utils/color';
 import { CURATED_FONTS, loadGoogleFont } from '../utils/fonts';
@@ -31,6 +30,10 @@ interface Props {
   view: ViewId;
   onView(v: ViewId): void;
   viewsWithArt: Record<ViewId, boolean>;
+  customGarments: CustomGarmentRecord[];
+  onAddCustom(): void;
+  onEditCustom(id: GarmentId): void;
+  onDeleteCustom(id: GarmentId): void;
   effect: PrintEffect;
   onEffect(e: PrintEffect): void;
   selection: SelectionInfo | null;
@@ -56,8 +59,6 @@ export function Section({ title, icon, children, right }: { title: string; icon:
     </section>
   );
 }
-
-const VIEW_LABEL: Record<ViewId, string> = { front: 'Front', back: 'Back', sleeve: 'Sleeve' };
 
 const DEFAULT_TEXT: TextStyle = {
   fontFamily: 'Bebas Neue',
@@ -116,7 +117,7 @@ export function Toolbar(p: Props) {
       }
     }
     setUploading(false);
-    if (added) p.onInfo(`Added ${added} graphic${added > 1 ? 's' : ''} to the ${VIEW_LABEL[p.view].toLowerCase()} view`);
+    if (added) p.onInfo(`Added ${added} graphic${added > 1 ? 's' : ''} to the ${viewLabel(p.garment, p.view).toLowerCase()} view`);
     if (fileRef.current) fileRef.current.value = '';
   };
 
@@ -139,26 +140,15 @@ export function Toolbar(p: Props) {
 
   return (
     <aside className="lc-scroll flex w-[300px] shrink-0 flex-col overflow-y-auto border-r border-white/[0.06] bg-[#111114]">
-      {/* Garment */}
-      <Section title="Garment" icon={<Shirt size={14} />}>
-        <div className="grid grid-cols-3 gap-2">
-          {GARMENT_LIST.map((g) => (
-            <button
-              key={g.id}
-              onClick={() => p.onGarment(g.id)}
-              title={g.name}
-              className={`group flex flex-col items-center rounded-lg border p-1.5 pb-2 transition ${
-                p.garment === g.id
-                  ? 'border-violet-500/70 bg-violet-500/[0.07]'
-                  : 'border-white/[0.07] bg-white/[0.02] hover:border-white/20'
-              }`}
-            >
-              <GarmentSVG garment={g.id} view="front" color={p.color} uid={`thumb-${g.id}`} width="100%" height={70} showShadow={false} />
-              <span className="mt-1 text-[11px] font-medium text-zinc-300">{g.short}</span>
-            </button>
-          ))}
-        </div>
-      </Section>
+      <GarmentPicker
+        garment={p.garment}
+        color={p.color}
+        customGarments={p.customGarments}
+        onGarment={p.onGarment}
+        onAddCustom={p.onAddCustom}
+        onEditCustom={p.onEditCustom}
+        onDeleteCustom={p.onDeleteCustom}
+      />
 
       {/* Color */}
       <Section title="Garment color" icon={<span className="block h-3 w-3 rounded-full border border-white/30" style={{ background: p.color }} />}>
@@ -198,17 +188,18 @@ export function Toolbar(p: Props) {
 
       {/* View */}
       <Section title="View" icon={<Sparkles size={14} />}>
-        <div className="grid grid-cols-3 gap-1 rounded-lg bg-black/30 p-1">
-          {VIEWS.map((v) => (
+        <div className="flex flex-wrap gap-1 rounded-lg bg-black/30 p-1">
+          {garmentViews(p.garment).map((v) => (
             <button
-              key={v}
-              onClick={() => p.onView(v)}
-              className={`relative rounded-md py-1.5 text-xs font-medium transition ${
-                p.view === v ? 'bg-zinc-700/80 text-white shadow' : 'text-zinc-400 hover:text-zinc-200'
+              key={v.id}
+              onClick={() => p.onView(v.id)}
+              title={`${v.label} · ${v.zone.widthIn} × ${v.zone.heightIn} in`}
+              className={`relative min-w-[30%] flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition ${
+                p.view === v.id ? 'bg-zinc-700/80 text-white shadow' : 'text-zinc-400 hover:text-zinc-200'
               }`}
             >
-              {VIEW_LABEL[v]}
-              {p.viewsWithArt[v] && <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-violet-500" />}
+              {v.label}
+              {p.viewsWithArt[v.id] && <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-violet-500" />}
             </button>
           ))}
         </div>
@@ -255,9 +246,10 @@ export function Toolbar(p: Props) {
           {PLACEMENTS.map((pl) => (
             <button
               key={pl.id}
+              disabled={!hasView(p.garment, pl.view)}
               onClick={() => p.onPlacement(pl)}
               title={`${pl.name} (${pl.view}) – ${pl.hint}. Applies to the selection, or all layers when nothing is selected.`}
-              className="flex flex-col items-center gap-1 rounded-lg border border-white/[0.07] bg-white/[0.02] px-1 py-2 transition hover:border-violet-500/50 hover:bg-violet-500/[0.06]"
+              className="flex flex-col items-center gap-1 rounded-lg border border-white/[0.07] bg-white/[0.02] px-1 py-2 transition hover:border-violet-500/50 hover:bg-violet-500/[0.06] disabled:pointer-events-none disabled:opacity-30"
             >
               <PlacementGlyph id={pl.id} />
               <span className="text-[11px] font-medium leading-tight text-zinc-200">{pl.name}</span>
@@ -380,7 +372,7 @@ export function Toolbar(p: Props) {
       </Section>
 
       {/* Print technique */}
-      <Section title={`Print technique · ${VIEW_LABEL[p.view]}`} icon={<Sparkles size={14} />}>
+      <Section title={`Print technique · ${viewLabel(p.garment, p.view)}`} icon={<Sparkles size={14} />}>
         <div className="grid grid-cols-2 gap-2">
           {PRINT_EFFECTS.map((fx) => (
             <button

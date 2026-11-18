@@ -8,10 +8,39 @@ npm run dev        # http://localhost:5173
 npm run build      # type-check + production build
 ```
 
+### Claude design assistant (optional)
+
+Copy `.env.example` to `.env.local`, add your Anthropic API key, and restart `npm run dev`:
+
+```
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+The key is read by a small proxy inside the Vite dev/preview server (`server/claudeProxy.ts`) and never reaches the browser. A static deployment of `dist/` has no proxy, so to use the assistant in production, host the same handler as a serverless function at `/api/claude`.
+
 ## Features
 
-- **Garment templates**: Oversized Drop-Shoulder Tee, Heavyweight Boxy Hoodie and Relaxed Crewneck, each with Front, Back and Sleeve views. Ribbing, stitching, folds and fabric texture are all derived from the chosen hex color.
+- **Garment library**: 16 built-in vector flat-lays, filtered by category pills, with ribbing, stitching, folds and fabric texture all derived from the chosen hex color:
+  - Tops: Boxy Tee, Long-Sleeve Tee, Polo, Tank, Crop Top
+  - Fleece (under Tops): Pullover Hoodie, Zip-Up Hoodie, Crewneck
+  - Bottoms: Joggers, Shorts, Cargo Pants
+  - Outerwear: Coach Jacket, Work Jacket
+  - Accessories: Tote, Dad Hat, Beanie
+
+  Each garment has its own views (for example Front / Back / Left Leg / Right Leg, or Crown) and print areas sized in inches, and the UI and tech pack follow them.
+- **Custom garments**: upload your own front/back flat-lay photos, drag the print area into place, set its real width in inches, and tint the photo with multiply or overlay blending.
 - **Design canvas**: a Fabric.js canvas sits over the safe print zone. It supports drag, corner-scale and rotate, snaps to the center with guides, and has layer ordering, lock/hide, and undo/redo per view.
+- **Assistant drawer** (the Assistant button): a slide-over with three local helpers that need no API key:
+  - **Layouts**: one-click streetwear layouts with real inch proportions (Minimal Left Chest + Oversized Back, Center Stacked Editorial, Sleeve Hit + Chest Logo, Neck Hit + Big Back). Artwork is copied across views as needed. There's also a "Balance this view" button.
+  - **Colors**: ink pairings for the garment color (high contrast, tonal, complementary accent, vintage), each with its contrast ratio, nearest Pantone and a suggested technique. It also checks the contrast of the inks already in your design, and can recolor the selection or the whole view.
+  - **Specs**: a manufacturing spec generator covering fabric weight (GSM / oz), composition, construction, trims, care and factory print notes for each view's print method. It flags fabric/method conflicts (for example DTG on nylon). The spec appears in the Size Chart, the CSV, and a Manufacturing Spec page in the PDF.
+- **Claude design assistant** (the drawer's "Ask Claude" tab): a chat panel where Claude (Opus 5.5) edits the design for you. It can:
+  - switch garments, colors, views and print techniques
+  - add and restyle text, and draw vector artwork as SVG
+  - move layers in inches and apply placement presets
+  - render the mockup to check its own work or critique yours
+
+  Every change goes through the normal undo history.
 - **Size / spec chart**: a graded measurement table for each garment, XXS to 5XL.
   - Tolerances and grade rules for each measurement, with entries in inches or cm (fractions like `23 1/2` work).
   - Auto-grade from a base size, or infer grade rules from existing values.
@@ -35,9 +64,13 @@ npm run build      # type-check + production build
 
 ```
 src/
+  data/
+    garments.ts                 garment registry: categories, views, print zones, size seeds, vector art
   App.tsx                       studio layout, state, shortcuts
   components/
-    GarmentTemplates.tsx        vector garment specs + color-adaptive renderer
+    GarmentTemplates.tsx        color-adaptive renderer for vector and photo garments
+    GarmentPicker.tsx           category pills + garment grid
+    CustomGarmentEditor.tsx     custom blank uploader with visual print-area editor
     DesignCanvas.tsx            Fabric.js canvas, snapping, history, imperative API
     Toolbar.tsx                 garment/color/view, uploads, typography, print technique
     LayersPanel.tsx             selection properties + layer list
@@ -45,14 +78,25 @@ src/
     DraftManager.tsx            collection drawer
     SizeChartEditor.tsx         size spec dialog (table, diagram, grading tools)
     GradingChart.tsx            grading line charts + sparklines
+    AssistantPanel.tsx          Claude chat (the "Ask Claude" tab)
+    assistant/                  drawer + Layouts / Colors / Specs helper tabs
     Header.tsx                  logo, name, undo/redo, save
   utils/
     exportTools.ts              mockup compose, 300 DPI PNG, PDF tech pack
     printEffects.ts             SVG filter definitions
     color.ts                    color math, Pantone matching, palette extraction
     fonts.ts                    Google Fonts loader
-    storage.ts                  IndexedDB persistence (idb-keyval)
+    storage.ts                  IndexedDB persistence (idb-keyval): drafts, workspace, custom garments
+  ai/
+    toolDefs.ts                 model, system prompt and tool schemas (shared with the server)
+    executor.ts                 runs Claude's tool calls against the studio
+    useStudioAgent.ts           client-side agent loop
+server/
+  claudeProxy.ts                Vite plugin: /api/claude proxy holding the API key
     placements.ts               placement presets
+    autoLayout.ts               layout recipes (inch boxes per view) + runner
+    colorHarmony.ts             contrast, HSL, ink library and pairing suggestions
+    manufacturingSpecs.ts       fabric profiles and print-method notes per garment
     sizeCharts.ts               size spec model, grading, validation, diagram lines, CSV
     fabricHelpers.ts            Fabric config + helpers
 ```

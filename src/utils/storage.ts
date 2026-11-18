@@ -1,5 +1,5 @@
 import { createStore, del, get, getMany, keys, set, setMany } from 'idb-keyval';
-import type { Draft, Workspace } from '../types';
+import type { CustomGarmentRecord, Draft, Workspace } from '../types';
 
 /**
  * IndexedDB persistence via idb-keyval. Unlike localStorage there's no ~5 MB cap, values are stored
@@ -83,4 +83,28 @@ export async function saveWorkspace(ws: Workspace): Promise<void> {
   } catch {
     /* non-fatal */
   }
+}
+
+/* ---------------------------------------------------------------- custom garment blanks */
+
+const GARMENT_PREFIX = 'garment:';
+
+export const newCustomGarmentId = () => `custom-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
+
+export async function listCustomGarments(): Promise<CustomGarmentRecord[]> {
+  await ready;
+  const ks = (await keys(store)).filter((k) => typeof k === 'string' && k.startsWith(GARMENT_PREFIX));
+  return (await getMany<CustomGarmentRecord | undefined>(ks, store))
+    .filter((g): g is CustomGarmentRecord => !!g)
+    .sort((a, b) => a.createdAt - b.createdAt);
+}
+
+export async function saveCustomGarment(g: CustomGarmentRecord): Promise<CustomGarmentRecord[]> {
+  await set(`${GARMENT_PREFIX}${g.id}`, g, store);
+  return listCustomGarments();
+}
+
+export async function deleteCustomGarment(id: string): Promise<CustomGarmentRecord[]> {
+  await del(`${GARMENT_PREFIX}${id}`, store);
+  return listCustomGarments();
 }

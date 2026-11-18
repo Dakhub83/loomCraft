@@ -1,4 +1,4 @@
-import { FilePlus2, FolderOpen, Redo2, Ruler, Save, Undo2 } from 'lucide-react';
+import { Bot, FilePlus2, FolderOpen, Redo2, Ruler, Save, Undo2 } from 'lucide-react';
 
 export function LoomCraftLogo({ size = 30 }: { size?: number }) {
   return (
@@ -33,6 +33,8 @@ interface Props {
   onNew(): void;
   onOpenDrafts(): void;
   onOpenSizeChart(): void;
+  assistantOpen: boolean;
+  onToggleAssistant(): void;
   draftCount: number;
 }
 
@@ -61,6 +63,13 @@ export function Header(p: Props) {
           <Redo2 size={15} />
         </button>
         <span className="mx-2 h-5 w-px bg-white/10" />
+        <button
+          onClick={p.onToggleAssistant}
+          className={`lc-btn h-8 gap-1.5 px-2.5 text-xs ${p.assistantOpen ? 'border-violet-500/60 bg-violet-500/15 text-violet-200' : ''}`}
+          title="Claude design assistant"
+        >
+          <Bot size={14} /> Assistant
+        </button>
         <button onClick={p.onOpenSizeChart} className="lc-btn h-8 gap-1.5 px-2.5 text-xs" title="Size / spec chart">
           <Ruler size={14} /> Size Chart
         </button>

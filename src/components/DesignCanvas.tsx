@@ -35,6 +35,46 @@ export interface TextStyle {
 
 export type ArrangeDir = 'forward' | 'backward' | 'front' | 'back';
 
+/** Machine-readable layer description (used by the AI assistant). Inches are relative to the print area. */
+export interface LayerDetail {
+  id: string;
+  name: string;
+  kind: LayerInfo['kind'];
+  visible: boolean;
+  locked: boolean;
+  widthIn: number;
+  heightIn: number;
+  /** Horizontal offset of the layer's center from the print-area center (negative = viewer's left). */
+  centerOffsetIn: number;
+  /** Distance from the top of the print area to the layer's top edge. */
+  topIn: number;
+  rotationDeg: number;
+  opacity: number;
+  text?: string;
+  fontFamily?: string;
+  fontSizePx?: number;
+  color?: string;
+  letterSpacing?: number;
+  bold?: boolean;
+  italic?: boolean;
+  effectiveDpi?: number;
+}
+
+/** A target box in inches relative to the print area (same shape as placement preset boxes). */
+export interface PlacementBox {
+  cx: number;
+  top: number;
+  maxW: number;
+  maxH: number;
+}
+
+export interface LayerGeometry {
+  widthIn?: number | null;
+  centerOffsetIn?: number | null;
+  topIn?: number | null;
+  rotationDeg?: number | null;
+}
+
 export interface DesignCanvasHandle {
   addImageFile(file: File, placement?: PlacementPreset | null): Promise<void>;
   addText(text: string, style: TextStyle): Promise<void>;
@@ -57,6 +97,26 @@ export interface DesignCanvasHandle {
   redo(): Promise<void>;
   isEditingText(): boolean;
   hasSelection(): boolean;
+  /** Layers top-most first, with geometry in inches. */
+  describeLayers(): LayerDetail[];
+  /** Select specific layers (empty array clears the selection). Returns ids that weren't found. */
+  selectLayers(ids: string[]): string[];
+  /** Restyle one layer by id (text props apply to text layers only). Returns false if not found. */
+  updateLayer(id: string, patch: Partial<TextStyle> & { text?: string; opacity?: number }): Promise<boolean>;
+  /** Resize / move / rotate one layer by id. Returns false if not found. */
+  setLayerGeometry(id: string, g: LayerGeometry): boolean;
+  /** Ids of the selected layers, top-most first. */
+  selectedIds(): string[];
+  /** Scale + align specific layers (as one group) into a box given in inches. */
+  placeLayers(ids: string[], box: PlacementBox): boolean;
+  /** Serialized copies of layers, for moving artwork to another view. */
+  exportLayers(ids: string[]): Array<Record<string, unknown>>;
+  /** Add serialized layers (new ids) and return their ids. */
+  importLayers(objects: Array<Record<string, unknown>>): Promise<string[]>;
+  /** Recolor text fills and vector fills/strokes; ids null = every text/vector layer. Returns layers changed. */
+  recolorLayers(ids: string[] | null, hex: string): number;
+  /** Distinct ink colors used by text and vector layers on this view. */
+  inkColors(): string[];
 }
 
 interface Props {
@@ -411,7 +471,7 @@ const DesignCanvasInner = forwardRef<DesignCanvasHandle, Props>(function DesignC
       else canvas.sendObjectToBack(o);
     };
 
-    return {
+    const handle: DesignCanvasHandle = {
       async addImageFile(file, placement) {
         const canvas = c();
         const isSvg = file.type === 'image/svg+xml' || /\.svg$/i.test(file.name);
@@ -623,6 +683,170 @@ const DesignCanvasInner = forwardRef<DesignCanvasHandle, Props>(function DesignC
         await restore(h.stack[h.index]);
       },
 
+      describeLayers() {
+        const canvas = c();
+        return canvas
+          .getObjects()
+          .slice()
+          .reverse()
+          .map((o) => {
+            o.setCoords();
+            const r = o.getBoundingRect();
+            const kind = objectKind(o);
+            const d: LayerDetail = {
+              id: meta(o).id!,
+              name: objectName(o),
+              kind,
+              visible: o.visible !== false,
+              locked: isLocked(o),
+              widthIn: +(r.width / ppi).toFixed(2),
+              heightIn: +(r.height / ppi).toFixed(2),
+              centerOffsetIn: +((r.left + r.width / 2 - zone.w / 2) / ppi).toFixed(2),
+              topIn: +(r.top / ppi).toFixed(2),
+              rotationDeg: Math.round(o.angle ?? 0),
+              opacity: +(o.opacity ?? 1).toFixed(2),
+            };
+            if (kind === 'text') {
+              const t = o as IText;
+              Object.assign(d, {
+                text: t.text,
+                fontFamily: t.fontFamily,
+                fontSizePx: Math.round(t.fontSize * t.scaleY),
+                color: typeof t.fill === 'string' ? t.fill : undefined,
+                letterSpacing: t.charSpacing,
+                bold: String(t.fontWeight) === 'bold' || Number(t.fontWeight) >= 600,
+                italic: t.fontStyle === 'italic',
+              });
+            }
+            if (kind === 'image') d.effectiveDpi = Math.round(ppi / Math.max(o.scaleX, o.scaleY));
+            return d;
+          });
+      },
+
+      selectLayers(ids) {
+        const canvas = c();
+        const found = ids.map(findById).filter((o): o is FabricObject => !!o && !isLocked(o) && o.visible !== false);
+        canvas.discardActiveObject();
+        selectObjects(found);
+        canvas.requestRenderAll();
+        emitSelection();
+        return ids.filter((id) => !findById(id));
+      },
+
+      async updateLayer(id, patch) {
+        const canvas = c();
+        const o = findById(id);
+        if (!o) return false;
+        const { opacity, ...textProps } = patch;
+        canvas.discardActiveObject();
+        canvas.setActiveObject(o);
+        if (objectKind(o) === 'text' && Object.keys(textProps).length) await handle.updateText(textProps);
+        if (opacity != null) o.set('opacity', Math.max(0.05, Math.min(1, opacity)));
+        o.setCoords();
+        canvas.requestRenderAll();
+        commit();
+        emitSelection();
+        return true;
+      },
+
+      setLayerGeometry(id, g) {
+        const canvas = c();
+        const o = findById(id);
+        if (!o) return false;
+        canvas.discardActiveObject();
+        if (g.rotationDeg != null) o.rotate(g.rotationDeg);
+        o.setCoords();
+        if (g.widthIn != null && g.widthIn > 0) {
+          const s = (g.widthIn * ppi) / Math.max(1, o.getBoundingRect().width);
+          o.set({ scaleX: o.scaleX * s, scaleY: o.scaleY * s });
+          o.setCoords();
+        }
+        const r = o.getBoundingRect();
+        let dx = 0;
+        let dy = 0;
+        if (g.centerOffsetIn != null) dx = zone.w / 2 + g.centerOffsetIn * ppi - (r.left + r.width / 2);
+        if (g.topIn != null) dy = g.topIn * ppi - r.top;
+        o.set({ left: (o.left ?? 0) + dx, top: (o.top ?? 0) + dy });
+        o.setCoords();
+        if (!isLocked(o)) canvas.setActiveObject(o);
+        canvas.requestRenderAll();
+        commit();
+        emitSelection();
+        return true;
+      },
+
+      selectedIds() {
+        const order = c().getObjects().slice().reverse();
+        const sel = new Set(c().getActiveObjects());
+        return order.filter((o) => sel.has(o)).map((o) => meta(o).id!);
+      },
+
+      placeLayers(ids, box) {
+        const objs = ids.map(findById).filter((o): o is FabricObject => !!o);
+        if (!objs.length) return false;
+        placeAt(objs, { box: () => box } as unknown as PlacementPreset);
+        commit();
+        emitSelection();
+        return true;
+      },
+
+      exportLayers(ids) {
+        return ids
+          .map(findById)
+          .filter((o): o is FabricObject => !!o)
+          .map((o) => o.toObject(SERIAL_PROPS) as Record<string, unknown>);
+      },
+
+      async importLayers(objects) {
+        const canvas = c();
+        await ensureFonts({ objects });
+        const enlivened = (await util.enlivenObjects(objects)) as FabricObject[];
+        const ids: string[] = [];
+        for (const o of enlivened) {
+          meta(o).id = newId();
+          o.setCoords();
+          canvas.add(o);
+          ids.push(meta(o).id!);
+        }
+        canvas.requestRenderAll();
+        commit();
+        return ids;
+      },
+
+      recolorLayers(ids, hex) {
+        const canvas = c();
+        const targets = (ids ? ids.map(findById) : canvas.getObjects()).filter(
+          (o): o is FabricObject => !!o && objectKind(o) !== 'image' && !isLocked(o),
+        );
+        const paint = (o: FabricObject) => {
+          const children = (o as unknown as { getObjects?: () => FabricObject[] }).getObjects?.();
+          if (children) return children.forEach(paint);
+          const isPaint = (v: unknown) => typeof v === 'string' && v !== 'none' && v !== 'transparent' && v !== '';
+          if (isPaint(o.fill)) o.set('fill', hex);
+          if (isPaint(o.stroke) && o.strokeWidth > 0) o.set('stroke', hex);
+          o.set('dirty', true);
+        };
+        targets.forEach(paint);
+        canvas.requestRenderAll();
+        if (targets.length) commit();
+        emitSelection();
+        return targets.length;
+      },
+
+      inkColors() {
+        const out = new Set<string>();
+        const walk = (o: FabricObject) => {
+          if (o.visible === false || objectKind(o) === 'image') return;
+          const children = (o as unknown as { getObjects?: () => FabricObject[] }).getObjects?.();
+          if (children) return children.forEach(walk);
+          for (const v of [o.fill, o.strokeWidth > 0 ? o.stroke : null]) {
+            if (typeof v === 'string' && v !== 'none' && v !== 'transparent') out.add(v);
+          }
+        };
+        c().getObjects().forEach(walk);
+        return [...out];
+      },
+
       isEditingText() {
         const o = fcRef.current?.getActiveObject() as IText | undefined;
         return !!o && 'isEditing' in o && !!o.isEditing;
@@ -632,6 +856,7 @@ const DesignCanvasInner = forwardRef<DesignCanvasHandle, Props>(function DesignC
         return !!fcRef.current?.getActiveObject();
       },
     };
+    return handle;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ppi, zone]);
 

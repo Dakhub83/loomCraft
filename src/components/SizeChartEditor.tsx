@@ -1,7 +1,8 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Download, Plus, RotateCcw, Ruler, Sparkles, Trash2, Wand2, X } from 'lucide-react';
-import type { GarmentId, MeasurePoint, SizeChart, SizeUnit } from '../types';
-import { GARMENTS, GarmentSVG } from './GarmentTemplates';
+import type { GarmentId, ManufacturingSpec, MeasurePoint, SizeChart, SizeUnit } from '../types';
+import { GarmentSVG } from './GarmentTemplates';
+import { getGarment } from '../data/garments';
 import { GradingChart, Sparkline } from './GradingChart';
 import {
   ALL_SIZES,
@@ -23,6 +24,8 @@ interface Props {
   garment: GarmentId;
   color: string;
   chart: SizeChart;
+  /** Manufacturing spec for this garment, shown as a fabric strip and exported with the CSV. */
+  spec?: ManufacturingSpec;
   onChange(chart: SizeChart): void;
   onReset(): void;
   onClose(): void;
@@ -79,12 +82,12 @@ function MeasureCell({
   );
 }
 
-export const SizeChartEditor = memo(function SizeChartEditor({ open, garment, color, chart, onChange, onReset, onClose, onInfo }: Props) {
+export const SizeChartEditor = memo(function SizeChartEditor({ open, garment, color, chart, spec, onChange, onReset, onClose, onInfo }: Props) {
   const [selected, setSelected] = useState<string | null>(chart.points[0]?.id ?? null);
   const [hover, setHover] = useState<string | null>(null);
   const [linked, setLinked] = useState(true);
   const dialogRef = useRef<HTMLDivElement>(null);
-  const g = GARMENTS[garment];
+  const g = getGarment(garment);
   const { unit, sizes, baseSize } = chart;
 
   useEffect(() => {
@@ -115,7 +118,7 @@ export const SizeChartEditor = memo(function SizeChartEditor({ open, garment, co
     updatePoint(p.id, { values: { ...p.values, [size]: v } }, linked && size === baseSize);
 
   const exportCSV = () => {
-    const blob = new Blob([chartToCSV(chart, g.name)], { type: 'text/csv;charset=utf-8' });
+    const blob = new Blob([chartToCSV(chart, g.name, spec)], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -190,6 +193,19 @@ export const SizeChartEditor = memo(function SizeChartEditor({ open, garment, co
           </button>
         </header>
 
+        {/* fabric spec strip (from the assistant's Specs tab) */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-white/[0.06] bg-violet-500/[0.04] px-5 py-2 text-[11px]">
+          <span className="font-semibold uppercase tracking-[0.12em] text-zinc-500">Fabric</span>
+          {spec ? (
+            <>
+              <span className="text-zinc-200">{spec.fabricWeight}</span>
+              <span className="text-zinc-400">{spec.composition}</span>
+            </>
+          ) : (
+            <span className="text-zinc-500">No manufacturing spec yet — generate one in Assistant → Specs to add fabric weight and composition here.</span>
+          )}
+        </div>
+
         {/* size range + options */}
         <div className="flex flex-wrap items-center gap-2 border-b border-white/[0.06] px-5 py-2.5">
           <span className="mr-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Size range</span>
@@ -230,7 +246,7 @@ export const SizeChartEditor = memo(function SizeChartEditor({ open, garment, co
           {/* diagram */}
           <aside className="lc-scroll hidden w-[300px] shrink-0 overflow-y-auto border-r border-white/[0.06] p-4 lg:block">
             <div className="relative mx-auto aspect-[500/560] w-full rounded-xl bg-[radial-gradient(ellipse_at_center,#ffffff0d,transparent_70%)]">
-              <GarmentSVG garment={garment} view="front" color={color} uid="spec" className="absolute inset-0 h-full w-full" width="100%" height="100%" showShadow={false} />
+              <GarmentSVG garment={garment} view={g.views[0].id} color={color} uid="spec" className="absolute inset-0 h-full w-full" width="100%" height="100%" showShadow={false} />
               <svg viewBox="0 0 500 560" className="absolute inset-0 h-full w-full overflow-visible" dangerouslySetInnerHTML={{ __html: overlay }} />
             </div>
             {selectedPoint && (

@@ -1,12 +1,16 @@
-export type GarmentId = 'tee' | 'hoodie' | 'crewneck';
-export type ViewId = 'front' | 'back' | 'sleeve';
+/** Built-in ids ('tee', 'joggers', …) or `custom-…` for user-uploaded blanks. See src/data/garments.ts. */
+export type GarmentId = string;
+/** Per-garment view id ('front', 'back', 'sleeve', 'left-leg', …). Each garment declares its own views. */
+export type ViewId = string;
+export type GarmentCategory = 'tops' | 'bottoms' | 'outerwear' | 'accessories' | 'custom';
 export type PrintEffect = 'none' | 'screen' | 'puff' | 'vintage';
 
 /** Serialized Fabric.js canvas (canvas.toObject()). */
 export type CanvasJSON = { objects?: Array<Record<string, unknown>> } & Record<string, unknown>;
 
-export type ViewDesigns = Record<ViewId, CanvasJSON | null>;
-export type ViewEffects = Record<ViewId, PrintEffect>;
+/** Keyed by view id. Views a garment doesn't have are kept (so switching back restores them) but ignored. */
+export type ViewDesigns = Partial<Record<ViewId, CanvasJSON | null>>;
+export type ViewEffects = Partial<Record<ViewId, PrintEffect>>;
 
 /** Printable area, in garment SVG units (1 unit = 1 screen px), plus its real-world size. */
 export interface PrintZone {
@@ -78,6 +82,21 @@ export interface SizeChart {
 
 export type SizeCharts = Partial<Record<GarmentId, SizeChart>>;
 
+/** Factory-facing fabric & print spec for one garment (all fields are editable free text). */
+export interface ManufacturingSpec {
+  fabricWeight: string;
+  composition: string;
+  construction: string;
+  trims: string;
+  printNotes: string;
+  care: string;
+  /** Print methods the spec was generated for, e.g. { front: 'puff' }, to flag when it's stale. */
+  basedOn: Record<string, PrintEffect>;
+  generatedAt: number;
+}
+
+export type ManufacturingSpecs = Partial<Record<GarmentId, ManufacturingSpec>>;
+
 export interface Draft {
   id: string;
   name: string;
@@ -86,6 +105,7 @@ export interface Draft {
   designs: ViewDesigns;
   effects: ViewEffects;
   sizeCharts?: SizeCharts;
+  mfgSpecs?: ManufacturingSpecs;
   thumbnail?: string;
   createdAt: number;
   updatedAt: number;
@@ -99,11 +119,23 @@ export interface Workspace {
   designs: ViewDesigns;
   effects: ViewEffects;
   sizeCharts?: SizeCharts;
+  mfgSpecs?: ManufacturingSpecs;
 }
 
-export const VIEWS: ViewId[] = ['front', 'back', 'sleeve'];
+export const emptyDesigns = (): ViewDesigns => ({});
+export const defaultEffects = (): ViewEffects => ({});
+export const effectFor = (effects: ViewEffects, view: ViewId): PrintEffect => effects[view] ?? 'none';
 
-export const emptyDesigns = (): ViewDesigns => ({ front: null, back: null, sleeve: null });
-export const defaultEffects = (): ViewEffects => ({ front: 'none', back: 'none', sleeve: 'none' });
+export const hasArtwork = (json: CanvasJSON | null | undefined) => !!json?.objects?.some((o) => o.visible !== false);
 
-export const hasArtwork = (json: CanvasJSON | null) => !!json?.objects?.some((o) => o.visible !== false);
+/** How a custom (photo) blank is recolored: multiply suits white/light blanks, overlay keeps highlights. */
+export type TintMode = 'multiply' | 'overlay' | 'none';
+
+/** A user-uploaded blank, persisted in IndexedDB. */
+export interface CustomGarmentRecord {
+  id: string;
+  name: string;
+  tint: TintMode;
+  views: Array<{ id: ViewId; label: string; image: string; zone: PrintZone }>;
+  createdAt: number;
+}
