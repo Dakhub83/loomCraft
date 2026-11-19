@@ -5,7 +5,7 @@ import { GarmentSVG } from './GarmentTemplates';
 import { getGarment } from '../data/garments';
 import { GradingChart, Sparkline } from './GradingChart';
 import {
-  ALL_SIZES,
+  ladderOf,
   addSize,
   autoGrade,
   chartToCSV,
@@ -209,7 +209,7 @@ export const SizeChartEditor = memo(function SizeChartEditor({ open, garment, co
         {/* size range + options */}
         <div className="flex flex-wrap items-center gap-2 border-b border-white/[0.06] px-5 py-2.5">
           <span className="mr-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Size range</span>
-          {ALL_SIZES.map((s) => {
+          {ladderOf(chart).map((s) => {
             const on = sizes.includes(s);
             return (
               <button
@@ -337,7 +337,7 @@ export const SizeChartEditor = memo(function SizeChartEditor({ open, garment, co
                                 unit={unit}
                                 onCommit={(v) => setCell(p, s, v)}
                                 className={cls}
-                                title={issue?.message ?? (s !== baseSize ? `Grade rule: ${formatMeasure(gradedValue(p, baseSize, s), unit)}` : 'Base size')}
+                                title={issue?.message ?? (s !== baseSize ? `Grade rule: ${formatMeasure(gradedValue(p, baseSize, s, ladderOf(chart)), unit)}` : 'Base size')}
                               />
                             </td>
                           );

@@ -20,7 +20,7 @@ interface FabricProfile {
   trims: string[];
   care: string;
   /** Fiber family – drives print-method compatibility warnings. */
-  fiber: 'cotton' | 'cotton-blend' | 'nylon' | 'acrylic' | 'canvas' | 'polyester';
+  fiber: 'cotton' | 'cotton-blend' | 'nylon' | 'acrylic' | 'canvas' | 'polyester' | 'leather' | 'foam';
   embroideryFirst?: boolean;
 }
 
@@ -137,6 +137,51 @@ const PROFILES: Record<string, FabricProfile> = {
     construction: ['8″ inseam compression fit', '2″ covered elastic waistband (no drawcord)', 'Gusseted crotch', 'Flatlock seams', 'Silicone gripper tape inside the leg hems'],
     trims: ['Heat-transfer logo on waistband or left thigh', 'Tagless heat-transfer care label', 'Colour-matched to the match shorts (competition rules)'],
   },
+  backpack: {
+    gsm: 0, weightNote: '600D recycled polyester, PU-coated', composition: '100% recycled polyester 600D Oxford; 210D polyester lining; EVA-padded back panel', fiber: 'polyester', care: 'Spot clean with a damp cloth · air dry · do not machine wash',
+    construction: ['25 L main compartment, two-way zip around the top', 'Padded 15″ laptop sleeve against the back panel', 'Zip front pocket with organiser', 'Side bottle pocket (elastic mesh), side compression straps', 'S-curve padded shoulder straps with sternum strap, 3 mm EVA back panel', 'Bound internal seams; bar-tacks at strap and handle anchors'],
+    trims: ['#8 coil zips with branded pullers (main), #5 (front pocket)', '1″ nylon webbing, ladder-lock adjusters', 'Woven label on the front panel or heat-transfer logo', 'Care / composition label inside'],
+  },
+  duffel: {
+    gsm: 0, weightNote: '600D recycled polyester, PU-coated', composition: '100% recycled polyester 600D Oxford; 210D polyester lining', fiber: 'polyester', care: 'Spot clean with a damp cloth · air dry · do not machine wash',
+    construction: ['40 L barrel body, #10 two-way zip along the top', 'Wrap-around webbing handles stitched to the base, hook-and-loop handle wrap', 'Detachable padded shoulder strap on metal D-rings', 'End-panel zip pocket (shoes / wet kit)', 'Reinforced base panel, 4 base feet optional'],
+    trims: ['#10 coil zip, metal pullers', '1.5″ polyester webbing', 'Metal D-rings and swivel snap hooks', 'Woven label, care label inside'],
+  },
+  beltbag: {
+    gsm: 0, weightNote: '210D nylon ripstop', composition: '100% nylon ripstop, PU-coated; 190T polyester lining', fiber: 'nylon', care: 'Spot clean with a damp cloth · air dry · do not machine wash',
+    construction: ['Crescent body with two-way top zip', 'Zip front pocket', 'Adjustable 1.5″ webbing strap, worn at the waist or cross-body', 'Breathable mesh back panel'],
+    trims: ['#5 coil zips with cord pullers', '1.5″ side-release buckle', 'Woven brand tab on the strap'],
+  },
+  drawstring: {
+    gsm: 0, weightNote: '210D polyester', composition: '100% polyester 210D', fiber: 'polyester', care: 'Machine wash cold · line dry',
+    construction: ['Single-compartment sack, 1.75″ top channel', 'Cords run through the channel and anchor at the bottom corners', 'Reinforced bottom corners with metal grommets'],
+    trims: ['5 mm polyester cord', 'Metal grommets', 'Printed care label'],
+  },
+  'low-top': {
+    gsm: 0, weightNote: '1.2–1.4 mm full-grain leather upper', composition: 'Leather upper; textile lining; EVA insole; rubber cupsole', fiber: 'leather', care: 'Wipe clean · condition leather · air dry away from heat', embroideryFirst: false,
+    construction: ['Cupsole construction: stitched-on rubber cupsole', 'Toe cap, quarter panels, eyestay and heel counter overlays', 'Padded collar and tongue, textile lining', 'Removable EVA insole', 'Flat waxed laces, 5 eyelet pairs'],
+    trims: ['Flat cotton laces (120 cm) with aglets', 'Woven tongue label', 'Heel pull tab', 'Printed sock-liner logo'],
+  },
+  'high-top': {
+    gsm: 0, weightNote: '10 oz canvas or leather upper', composition: 'Cotton canvas (or leather) upper; textile lining; vulcanised rubber sole', fiber: 'canvas', care: 'Spot clean · air dry away from heat', embroideryFirst: false,
+    construction: ['Vulcanised construction: rubber foxing tape around the upper', 'Padded ankle collar, 7 eyelet pairs', 'Toe cap and heel counter overlays', 'Cushioned insole'],
+    trims: ['Flat cotton laces (160 cm) with aglets', 'Ankle patch (rubber or woven)', 'Heel pull tab'],
+  },
+  slides: {
+    gsm: 0, weightNote: 'Injection-moulded EVA', composition: 'Injection-moulded EVA footbed and strap (one piece) or EVA footbed with synthetic-leather strap', fiber: 'foam', care: 'Rinse with water · air dry away from heat', embroideryFirst: false,
+    construction: ['Contoured footbed with raised heel cup and toe ridge', 'One-piece moulded strap (or cemented synthetic strap)', 'Textured outsole for grip'],
+    trims: ['Moulded / debossed logo on the strap', 'Footbed print (pad print) at the heel', 'Size moulded under the arch'],
+  },
+  snapback: {
+    gsm: 270, weightNote: 'Cotton twill, buckram-backed front', composition: '100% cotton twill (or acrylic/wool blend); buckram front panels', fiber: 'cotton', care: 'Spot clean · do not machine wash', embroideryFirst: true,
+    construction: ['Structured 6-panel, high profile', 'Flat brim with 8 rows of stitching, green under-visor optional', 'Plastic snap closure, 7 positions', 'Sewn eyelets, top button, taped seams'],
+    trims: ['Plastic snapback closure', 'Cotton sweatband', 'Woven inside label'],
+  },
+  'bucket-hat': {
+    gsm: 270, weightNote: 'Washed cotton twill', composition: '100% cotton twill, garment-washed', fiber: 'cotton', care: 'Machine wash cold · reshape and air dry', embroideryFirst: true,
+    construction: ['6-panel crown with flat top', 'Downward-angled brim with 4 rows of stitching', 'Taped inner seams, 2 sewn vent eyelets'],
+    trims: ['Cotton sweatband', 'Woven inside label'],
+  },
   'soccer-socks': {
     gsm: 0, weightNote: 'Knit sock, 168-needle, cushioned foot', composition: '75% nylon / 20% polyester / 5% elastane', fiber: 'polyester', care: 'Machine wash cold · do not tumble dry · do not iron', embroideryFirst: false,
     construction: ['Knee-high rib leg with fold-over cuff', 'Terry-cushioned sole, heel and toe', 'Arch support band', 'Knitted-in cuff stripes (yarn colours to spec)'],
@@ -145,6 +190,14 @@ const PROFILES: Record<string, FabricProfile> = {
 };
 
 const CATEGORY_FALLBACK: Record<string, FabricProfile> = {
+  bags: {
+    gsm: 0, weightNote: '600D polyester', composition: '100% polyester 600D, PU-coated; polyester lining', fiber: 'polyester', care: 'Spot clean with a damp cloth · air dry · do not machine wash',
+    construction: ['Specify compartments, zips and padding'], trims: ['Coil zips with pullers', 'Webbing and hardware', 'Woven label'],
+  },
+  footwear: {
+    gsm: 0, weightNote: 'Specify upper material', composition: 'Specify upper, lining, insole and outsole', fiber: 'leather', care: 'Wipe clean · air dry away from heat',
+    construction: ['Specify construction (cupsole / vulcanised / moulded)'], trims: ['Laces', 'Tongue label'],
+  },
   custom: {
     gsm: 0, weightNote: 'Specify fabric weight', composition: 'Specify fiber content', fiber: 'cotton', care: COTTON_CARE,
     construction: ['Specify construction details'], trims: ['Neck/brand label', 'Care label'],
@@ -190,6 +243,10 @@ function methodNotes(method: PrintEffect, darkGarment: boolean, profile: FabricP
   if (profile.fiber === 'polyester' && method !== 'none')
     notes.push('⚠ Polyester: use low-bleed (dye-blocker) ink and a low-cure plastisol (~150 °C) to prevent dye migration.');
   if (profile.fiber === 'nylon' && method !== 'none') notes.push('⚠ Nylon shell: add nylon bonding agent / catalyst to plastisol and run a pre-production wash test.');
+  if (profile.fiber === 'leather')
+    notes.push('⚠ Leather / suede: screen ink and DTG crack or rub off. Use UV-LED print with flexible ink, heat-transfer (PU) film, laser etch, or emboss / deboss; test adhesion on the finished hide.');
+  if (profile.fiber === 'foam')
+    notes.push('⚠ EVA foam: print with pad printing or UV-LED, or mould the artwork in (emboss / deboss); screen ink does not bond to the foam skin.');
   return notes;
 }
 

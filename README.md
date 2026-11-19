@@ -25,7 +25,9 @@ The key is read by a small proxy inside the Vite dev/preview server (`server/cla
   - Fleece (under Tops): Pullover Hoodie, Zip-Up Hoodie, Crewneck
   - Bottoms: Joggers, Shorts, Cargo Pants
   - Outerwear: Coach Jacket, Work Jacket
-  - Accessories: Tote, Dad Hat, Beanie
+  - Bags: Backpack (front, pocket, side and back print areas), Duffel Bag (sides and end panel), Belt Bag, Tote Bag, Drawstring Bag
+  - Footwear: Low-Top and High-Top Sneakers (outside, inside, tongue and heel print areas, US shoe-size grading), Slides (strap and footbed)
+  - Headwear: Dad Hat, Snapback Cap, Bucket Hat, Beanie
   - Soccer: Soccer Jersey (V-neck, mesh side panels), Goalkeeper Jersey (padded elbows), Training Quarter-Zip, Soccer Shorts, Soccer Socks, plus an Underlayer group: a compression Base Layer Top and Compression Shorts (sliding shorts) in a new Compression knit fabric. Each has print zones for crests, sponsors, back name and number, sleeve badges and shorts numbers, plus a kit-specific manufacturing profile.
 
   Each garment has its own views (for example Front / Back / Left Leg / Right Leg, or Crown) and print areas sized in inches, and the UI and tech pack follow them.
@@ -37,6 +39,7 @@ The key is read by a small proxy inside the Vite dev/preview server (`server/cla
   - Recommended swatches come first, rendered in your garment color, with more fabrics below.
   - The weave shows on the design view, in exported mockups and in the 360° view.
   - The choice is saved with the design, printed in the PDF tech pack and used by the manufacturing spec.
+- **360° Mockup**: in the 360° view, export a full turn of the design as an MP4/WebM video, a looping GIF, a self-contained drag-to-rotate web page, or a numbered frame set (with viewer) for e-commerce 360° players. Square, 4:5, 9:16 or 16:9; white, grey, dark, custom or transparent background; it keeps the current zoom, tilt, fabric, mannequin and interior cut.
 - **Mannequin Studio**: a sized, studio-lit 3D mannequin (the "Mannequin" button above the canvas):
   - Full-body mannequin or torso dress form; Athletic Male, Female and Neutral Unisex presets; live chest, waist, hips, shoulder-width and height sliders that morph the body smoothly.
   - Four surfaces (matte clay, satin fiberglass, graphite carbon, tailor's linen) on a brushed-steel stand with three-point lighting and soft shadows.

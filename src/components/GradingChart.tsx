@@ -1,6 +1,6 @@
 import { memo, useState } from 'react';
 import type { MeasurePoint, SizeChart } from '../types';
-import { formatMeasure, gradedValue, toUnit } from '../utils/sizeCharts';
+import { formatMeasure, gradedValue, ladderOf, toUnit } from '../utils/sizeCharts';
 
 const ACCENT = '#8b5cf6';
 const WARN = '#fb923c';
@@ -78,7 +78,7 @@ export const GradingChart = memo(function GradingChart({ chart, point, onHover }
   if (mode === 'single') {
     if (!point) return <div>{header}</div>;
     const vals = sizes.map((s) => (point.values[s] == null ? null : toUnit(point.values[s], unit)));
-    const rule = sizes.map((s) => toUnit(gradedValue(point, baseSize, s), unit));
+    const rule = sizes.map((s) => toUnit(gradedValue(point, baseSize, s, ladderOf(chart)), unit));
     const tol = toUnit(point.tolerance, unit);
     const all = [...(vals.filter((v) => v != null) as number[]), ...rule.map((r) => r + tol), ...rule.map((r) => r - tol)];
     const lo = Math.min(...all);

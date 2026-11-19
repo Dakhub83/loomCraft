@@ -50,17 +50,20 @@ export function measureOverlayMarkup(
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 
-export const sortSizes = (sizes: string[]) =>
+/** The ladder a chart grades on: its own (footwear) or the apparel ladder. */
+export const ladderOf = (chart: { ladder?: string[] }): string[] => chart.ladder ?? ALL_SIZES;
+
+export const sortSizes = (sizes: string[], ladder: string[] = ALL_SIZES) =>
   [...sizes].sort((a, b) => {
-    const ia = ALL_SIZES.indexOf(a);
-    const ib = ALL_SIZES.indexOf(b);
+    const ia = ladder.indexOf(a);
+    const ib = ladder.indexOf(b);
     return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
   });
 
 /** Value for `size` from the base value and grade rule (grade steps are counted on the full size ladder). */
-export function gradedValue(p: MeasurePoint, baseSize: string, size: string): number {
+export function gradedValue(p: MeasurePoint, baseSize: string, size: string, ladder: string[] = ALL_SIZES): number {
   const base = p.values[baseSize] ?? 0;
-  const steps = ALL_SIZES.indexOf(size) - ALL_SIZES.indexOf(baseSize);
+  const steps = ladder.indexOf(size) - ladder.indexOf(baseSize);
   return Math.max(0, round(base + steps * p.grade, 1 / 16));
 }
 
@@ -69,12 +72,13 @@ export function defaultSizeChart(garment: GarmentId): SizeChart {
   const seed = getGarment(garment).sizeChart;
   const sizes = seed.sizes ?? DEFAULT_SIZES;
   const baseSize = seed.base ?? 'M';
+  const ladder = seed.ladder ?? ALL_SIZES;
   const points: MeasurePoint[] = seed.points.map(([code, name, how, base, grade, tolerance, diagram]) => {
     const p: MeasurePoint = { id: uid(), code, name, how, grade, tolerance, values: { [baseSize]: base }, diagram };
-    for (const s of sizes) p.values[s] = gradedValue(p, baseSize, s);
+    for (const s of sizes) p.values[s] = gradedValue(p, baseSize, s, ladder);
     return p;
   });
-  return { sizes: [...sizes], baseSize, unit: 'in', points, includeInTechPack: true };
+  return { sizes: [...sizes], baseSize, unit: 'in', points, includeInTechPack: true, ...(seed.ladder ? { ladder: [...seed.ladder] } : {}) };
 }
 
 /** Recompute every size from the base size using each point's grade rule. */
@@ -84,7 +88,7 @@ export function autoGrade(chart: SizeChart, onlyPointId?: string): SizeChart {
     points: chart.points.map((p) => {
       if (onlyPointId && p.id !== onlyPointId) return p;
       const values = { ...p.values };
-      for (const s of chart.sizes) if (s !== chart.baseSize) values[s] = gradedValue(p, chart.baseSize, s);
+      for (const s of chart.sizes) if (s !== chart.baseSize) values[s] = gradedValue(p, chart.baseSize, s, ladderOf(chart));
       return { ...p, values };
     }),
   };
@@ -92,7 +96,7 @@ export function autoGrade(chart: SizeChart, onlyPointId?: string): SizeChart {
 
 /** Infer each point's grade rule from its current values (average step across the visible sizes). */
 export function inferGrades(chart: SizeChart): SizeChart {
-  const idx = chart.sizes.map((s) => ALL_SIZES.indexOf(s));
+  const idx = chart.sizes.map((s) => ladderOf(chart).indexOf(s));
   return {
     ...chart,
     points: chart.points.map((p) => {
@@ -107,9 +111,9 @@ export function inferGrades(chart: SizeChart): SizeChart {
 
 export function addSize(chart: SizeChart, size: string): SizeChart {
   if (chart.sizes.includes(size)) return chart;
-  const sizes = sortSizes([...chart.sizes, size]);
+  const sizes = sortSizes([...chart.sizes, size], ladderOf(chart));
   const points = chart.points.map((p) =>
-    p.values[size] != null ? p : { ...p, values: { ...p.values, [size]: gradedValue(p, chart.baseSize, size) } },
+    p.values[size] != null ? p : { ...p, values: { ...p.values, [size]: gradedValue(p, chart.baseSize, size, ladderOf(chart)) } },
   );
   return { ...chart, sizes, points };
 }
@@ -157,7 +161,7 @@ export function validateChart(chart: SizeChart): ChartIssue[] {
       if (p.grade > 0 && prev != null && v < prev) {
         issues.push({ pointId: p.id, size: s, kind: 'non-monotonic', message: `${p.code} ${s} is smaller than the previous size` });
       }
-      if (s !== chart.baseSize && Math.abs(v - gradedValue(p, chart.baseSize, s)) > p.tolerance + 1e-6) {
+      if (s !== chart.baseSize && Math.abs(v - gradedValue(p, chart.baseSize, s, ladderOf(chart))) > p.tolerance + 1e-6) {
         issues.push({ pointId: p.id, size: s, kind: 'off-grade', message: `${p.code} ${s} is outside tolerance of the grade rule` });
       }
       prev = v;

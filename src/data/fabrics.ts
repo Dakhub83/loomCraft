@@ -7,7 +7,7 @@ import { getGarment } from './garments';
  * a fabric is chosen explicitly for a garment.
  * ============================================================================================== */
 
-export type WeaveKind = 'jersey' | 'pique' | 'fleece' | 'terry' | 'rib' | 'nylon' | 'twill' | 'denim' | 'canvas' | 'mesh' | 'performance';
+export type WeaveKind = 'jersey' | 'pique' | 'fleece' | 'terry' | 'rib' | 'nylon' | 'twill' | 'denim' | 'canvas' | 'mesh' | 'performance' | 'leather' | 'suede' | 'foam';
 
 export interface FabricLook {
   weave: WeaveKind;
@@ -33,7 +33,7 @@ export interface FabricDef {
   gsm: number;
   weightNote?: string;
   composition: string;
-  fiber: 'cotton' | 'cotton-blend' | 'nylon' | 'acrylic' | 'canvas' | 'polyester';
+  fiber: 'cotton' | 'cotton-blend' | 'nylon' | 'acrylic' | 'canvas' | 'polyester' | 'leather' | 'foam';
   care: string;
   description: string;
   look: FabricLook;
@@ -180,6 +180,66 @@ export const FABRICS: FabricDef[] = [
     look: { weave: 'jersey', tileIn: 0.22, roughness: 0.66, sheen: 0.4, sheenRoughness: 0.35, normalStrength: 0.2, mottle: 0.005 },
   },
   {
+    id: 'poly600d',
+    name: '600D bag polyester',
+    short: '600D Poly',
+    gsm: 0,
+    weightNote: '600D recycled polyester, PU-coated back',
+    composition: '100% recycled polyester 600D Oxford weave, PU coating',
+    fiber: 'polyester',
+    care: 'Spot clean with a damp cloth · air dry · do not machine wash',
+    description: 'Tough, water-resistant woven polyester: backpacks, duffels and belt bags.',
+    look: { weave: 'canvas', tileIn: 0.14, roughness: 0.72, sheen: 0.12, sheenRoughness: 0.4, normalStrength: 0.7, mottle: 0.02, clearcoat: 0.08 },
+  },
+  {
+    id: 'leather',
+    name: 'Full-grain leather',
+    short: 'Leather',
+    gsm: 0,
+    weightNote: '1.2–1.4 mm full-grain leather',
+    composition: 'Full-grain cowhide leather, chrome-free (LWG-certified tannery)',
+    fiber: 'leather',
+    care: 'Wipe clean · condition regularly · keep away from direct heat',
+    description: 'Smooth, lightly pebbled leather with a soft sheen: sneaker uppers and bag trims.',
+    look: { weave: 'leather', tileIn: 0.5, roughness: 0.48, sheen: 0.1, sheenRoughness: 0.5, normalStrength: 0.35, mottle: 0.03, clearcoat: 0.3 },
+  },
+  {
+    id: 'suede',
+    name: 'Suede',
+    short: 'Suede',
+    gsm: 0,
+    weightNote: '1.0–1.2 mm split suede',
+    composition: 'Cowhide split suede',
+    fiber: 'leather',
+    care: 'Brush dry · suede protector spray · do not wash',
+    description: 'Matte napped leather with a velvety surface: overlays and casual uppers.',
+    look: { weave: 'suede', tileIn: 0.3, roughness: 0.97, sheen: 0.7, sheenRoughness: 0.75, normalStrength: 0.3, mottle: 0.06 },
+  },
+  {
+    id: 'engineered-knit',
+    name: 'Engineered knit',
+    short: 'Knit',
+    gsm: 0,
+    weightNote: 'Engineered flat-knit upper',
+    composition: '100% recycled polyester engineered knit, TPU heel and eyestay reinforcement',
+    fiber: 'polyester',
+    care: 'Hand wash cold · air dry · do not machine dry',
+    description: 'Breathable one-piece knitted upper with a fine textured face: lightweight sneakers.',
+    look: { weave: 'pique', tileIn: 0.2, roughness: 0.8, sheen: 0.45, sheenRoughness: 0.45, normalStrength: 0.6, mottle: 0.02 },
+  },
+  {
+    id: 'eva-foam',
+    name: 'Moulded EVA foam',
+    short: 'EVA',
+    gsm: 0,
+    weightNote: 'Injection-moulded EVA, Shore C 50–55',
+    composition: 'Injection-moulded EVA foam',
+    fiber: 'foam',
+    care: 'Rinse with water · air dry away from direct heat',
+    description: 'Lightweight cushioned foam with a soft satin skin: slides and midsoles.',
+    look: { weave: 'foam', tileIn: 0.6, roughness: 0.62, sheen: 0.15, sheenRoughness: 0.5, normalStrength: 0.25, mottle: 0.01 },
+  },
+  {
     id: 'mesh',
     name: 'Athletic mesh',
     short: 'Mesh',
@@ -219,6 +279,15 @@ const GARMENT_DEFAULT: Record<string, string> = {
   'soccer-socks': 'rib',
   'base-layer': 'compression',
   'compression-shorts': 'compression',
+  backpack: 'poly600d',
+  duffel: 'poly600d',
+  beltbag: 'nylon',
+  drawstring: 'nylon',
+  'low-top': 'leather',
+  'high-top': 'canvas',
+  slides: 'eva-foam',
+  snapback: 'twill',
+  'bucket-hat': 'twill',
 };
 
 /** Fabrics that suit a garment, its default first. The picker shows these before the rest. */
@@ -227,10 +296,15 @@ const SUGGEST: Record<string, string[]> = {
   bottoms: ['fleece', 'terry', 'twill', 'denim', 'performance', 'mesh'],
   outerwear: ['nylon', 'canvas', 'denim', 'fleece', 'twill'],
   soccer: ['performance', 'mesh', 'pique', 'jersey', 'compression'],
-  accessories: ['canvas', 'twill', 'denim', 'rib', 'nylon'],
+  bags: ['poly600d', 'canvas', 'nylon', 'leather', 'denim'],
+  footwear: ['leather', 'suede', 'canvas', 'engineered-knit'],
+  accessories: ['twill', 'canvas', 'denim', 'nylon', 'rib'],
 };
 const SUGGEST_BY_ID: Record<string, string[]> = {
   'soccer-socks': ['rib', 'performance'],
+  tote: ['canvas', 'denim', 'poly600d', 'nylon'],
+  drawstring: ['nylon', 'poly600d', 'canvas', 'performance'],
+  slides: ['eva-foam', 'leather'],
   'base-layer': ['compression', 'performance', 'jersey'],
   'compression-shorts': ['compression', 'performance'],
   hoodie: ['fleece', 'terry', 'heavy-jersey'],
@@ -249,7 +323,8 @@ export function defaultFabricFor(garment: GarmentId): FabricDef {
   const id = GARMENT_DEFAULT[garment];
   if (id) return BY_ID.get(id)!;
   const cat = getGarment(garment).category;
-  return BY_ID.get(cat === 'outerwear' ? 'nylon' : cat === 'accessories' ? 'canvas' : cat === 'soccer' ? 'performance' : 'jersey')!;
+  const byCategory: Partial<Record<string, string>> = { outerwear: 'nylon', accessories: 'twill', soccer: 'performance', bags: 'poly600d', footwear: 'leather' };
+  return BY_ID.get(byCategory[cat] ?? 'jersey')!;
 }
 
 /** The fabric in use: an explicit choice for this garment, else its default. */

@@ -73,7 +73,8 @@ export interface GarmentDef {
   group?: string;
   spec: string;
   views: GarmentView[];
-  sizeChart: { sizes?: string[]; base?: string; points: PomSeed[] };
+  /** `ladder`: the sizes grade steps are counted on, when not the apparel ladder (e.g. US shoe sizes). */
+  sizeChart: { sizes?: string[]; base?: string; ladder?: string[]; points: PomSeed[] };
   /** Measurement diagram lines on the first view (optional). */
   measureLines?: Record<string, MeasureLine>;
   /** Present for user-uploaded blanks. */
@@ -85,7 +86,9 @@ export const CATEGORIES: Array<{ id: GarmentCategory; label: string }> = [
   { id: 'bottoms', label: 'Bottoms' },
   { id: 'outerwear', label: 'Outerwear' },
   { id: 'soccer', label: 'Soccer' },
-  { id: 'accessories', label: 'Accessories' },
+  { id: 'bags', label: 'Bags' },
+  { id: 'footwear', label: 'Footwear' },
+  { id: 'accessories', label: 'Headwear' },
   { id: 'custom', label: 'Custom' },
 ];
 
@@ -937,7 +940,8 @@ const TOTE: GarmentDef = {
   id: 'tote',
   name: 'Tote Bag',
   short: 'Tote',
-  category: 'accessories',
+  category: 'bags',
+  group: 'Totes & sacks',
   spec: '12 oz natural canvas · 15 × 16 in · reinforced handles',
   views: [
     { id: 'front', label: 'Front', art: TOTE_ART, zone: zone(140, 250, 220, 240, 11, 12, 'Centered on bag body') },
@@ -963,6 +967,7 @@ const DADHAT: GarmentDef = {
   name: 'Dad Hat',
   short: 'Dad Hat',
   category: 'accessories',
+  group: 'Caps',
   spec: 'Washed cotton twill · unstructured 6-panel · strap back',
   views: [
     {
@@ -1015,6 +1020,7 @@ const BEANIE: GarmentDef = {
   name: 'Cuffed Beanie',
   short: 'Beanie',
   category: 'accessories',
+  group: 'Hats',
   spec: 'Acrylic 1×1 rib knit · fold-over cuff',
   views: [
     {
@@ -1387,6 +1393,486 @@ const COMP_SHORTS: GarmentDef = {
   },
 };
 
+/* ------------------------------------------------------------------------- shared helpers */
+
+/** Mirrors artwork left ↔ right (x → 500 − x). Paths must use absolute "x,y" coordinates only. */
+const mirrorD = (d: string) => d.replace(/(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/g, (_, x: string, y: string) => `${+(GARMENT_W - Number(x)).toFixed(2)},${y}`);
+function mirrorArt(a: VectorArt): VectorArt {
+  const p = (list?: Panel[]) => list?.map((x) => ({ ...x, d: mirrorD(x.d) }));
+  const b = (list?: Band[]) => list?.map((x) => ({ ...x, d: mirrorD(x.d) }));
+  return {
+    behind: p(a.behind),
+    panels: p(a.panels)!,
+    ribs: b(a.ribs),
+    seams: a.seams?.map(mirrorD),
+    stitches: a.stitches?.map(mirrorD),
+    folds: a.folds?.map(mirrorD),
+    cords: b(a.cords),
+    eyelets: a.eyelets?.map(([x, y]) => [GARMENT_W - x, y] as [number, number]),
+    buttons: a.buttons?.map(([x, y, r]) => [GARMENT_W - x, y, r] as [number, number, number]),
+  };
+}
+const mirrorZone = (z: PrintZone, placement: string): PrintZone => ({ ...z, x: GARMENT_W - z.x - z.w, placement });
+
+/** US men's shoe sizes in half steps: grade rules count one step per half size. */
+const SHOE_LADDER = ['US 5', 'US 5.5', 'US 6', 'US 6.5', 'US 7', 'US 7.5', 'US 8', 'US 8.5', 'US 9', 'US 9.5', 'US 10', 'US 10.5', 'US 11', 'US 11.5', 'US 12', 'US 12.5', 'US 13', 'US 13.5', 'US 14'];
+const SHOE_SIZES = ['US 7', 'US 8', 'US 9', 'US 10', 'US 11', 'US 12'];
+
+/* ------------------------------------------------------------------------- BAGS */
+
+const BACKPACK_BODY = 'M116,120 C116,80 150,64 196,62 L304,62 C350,64 384,80 384,120 L390,500 C390,520 376,528 356,528 L144,528 C124,528 110,520 110,500 Z';
+const BACKPACK_FRONT: VectorArt = {
+  behind: [
+    { d: 'M150,98 C146,60 176,50 198,70 L192,100 Z', tone: -0.14 },
+    { d: 'M350,98 C354,60 324,50 302,70 L308,100 Z', tone: -0.14 },
+  ],
+  panels: [
+    { d: BACKPACK_BODY },
+    { d: 'M111,470 L389,470 L390,500 C390,520 376,528 356,528 L144,528 C124,528 110,520 110,500 Z', tone: -0.12 },
+    { d: 'M150,296 L350,296 C362,296 368,304 368,316 L372,456 C372,470 362,476 350,476 L150,476 C138,476 128,470 128,456 L132,316 C132,304 138,296 150,296 Z', tone: -0.05 },
+  ],
+  ribs: [
+    { d: 'M122,138 C180,106 320,106 378,138', w: 6, tone: -0.2 },
+    { d: 'M146,314 L354,314', w: 5, tone: -0.2 },
+  ],
+  cords: [
+    { d: 'M222,66 C222,28 278,28 278,66', w: 12, tone: -0.1 },
+    { d: 'M372,136 L380,162', w: 4, tone: -0.3 },
+    { d: 'M346,316 L350,340', w: 4, tone: -0.3 },
+  ],
+  stitches: [
+    'M124,124 C124,88 154,72 198,70 L302,70 C346,72 376,88 376,124 L382,462',
+    'M154,304 L346,304 C356,304 360,310 360,318 L364,454 C364,464 358,468 348,468 L152,468 C142,468 136,464 136,454 L140,318 C140,310 144,304 154,304 Z',
+    'M112,478 L388,478',
+  ],
+  folds: ['M140,200 C150,260 146,300 138,330', 'M362,200 C352,260 356,300 364,330'],
+};
+const BACKPACK_BACK: VectorArt = {
+  panels: [
+    { d: BACKPACK_BODY },
+    { d: 'M140,110 C140,90 160,84 180,84 L320,84 C340,84 360,90 360,110 L364,440 C364,456 352,462 336,462 L164,462 C148,462 136,456 136,440 Z', tone: -0.06 },
+    { d: 'M168,86 C150,180 150,320 176,456 L210,456 C186,320 186,180 202,86 Z', tone: -0.14 },
+    { d: 'M332,86 C350,180 350,320 324,456 L290,456 C314,320 314,180 298,86 Z', tone: -0.14 },
+    { d: 'M190,250 L310,250 L310,264 L190,264 Z', tone: -0.2 },
+    { d: 'M172,430 L212,430 L212,446 L172,446 Z', tone: -0.3 },
+    { d: 'M288,430 L328,430 L328,446 L288,446 Z', tone: -0.3 },
+  ],
+  cords: [{ d: 'M222,66 C222,28 278,28 278,66', w: 12, tone: -0.1 }],
+  stitches: ['M250,120 L250,240', 'M250,276 L250,440', 'M212,190 L288,190', 'M214,340 L286,340'],
+};
+const BACKPACK_SIDE: VectorArt = {
+  panels: [
+    { d: 'M196,96 C196,72 214,62 236,62 L264,62 C286,62 304,72 304,96 L310,504 C310,520 300,528 284,528 L216,528 C200,528 190,520 190,504 Z' },
+    { d: 'M192,330 L308,330 L310,504 C310,520 300,528 284,528 L216,528 C200,528 190,520 190,504 Z', tone: -0.06 },
+    { d: 'M304,110 C322,200 324,330 312,470 L298,470 C306,330 304,200 296,110 Z', tone: -0.14 },
+    { d: 'M196,250 L304,250 L304,264 L196,264 Z', tone: -0.18 },
+  ],
+  ribs: [{ d: 'M192,342 L308,342', w: 9 }],
+  stitches: ['M200,104 L206,500', 'M296,104 L300,320'],
+};
+
+const BACKPACK: GarmentDef = {
+  id: 'backpack',
+  name: 'Backpack',
+  short: 'Backpack',
+  category: 'bags',
+  group: 'Packs',
+  spec: '600D recycled polyester · 25 L · padded laptop sleeve · zip front pocket',
+  views: [
+    { id: 'front', label: 'Front', art: BACKPACK_FRONT, zone: zone(160, 160, 180, 110, 7.8, 4.8, 'Main front panel, above the pocket') },
+    { id: 'pocket', label: 'Pocket', art: BACKPACK_FRONT, zone: zone(160, 330, 180, 120, 7.8, 5.2, 'Front pocket, centred') },
+    { id: 'side', label: 'Side', art: BACKPACK_SIDE, zone: zone(214, 120, 72, 110, 3.1, 4.8, 'Side panel, above the compression strap') },
+    { id: 'back', label: 'Back', art: BACKPACK_BACK, zone: zone(212, 110, 76, 60, 3.3, 2.6, 'Top of the back panel, between the straps') },
+  ],
+  sizeChart: {
+    sizes: ['OS'],
+    base: 'OS',
+    points: [
+      ['A', 'Height', 'Base to top seam, excluding handle', 18, 0, 0.25],
+      ['B', 'Width', 'Across the front panel at its widest', 12, 0, 0.25],
+      ['C', 'Depth', 'Front to back at the base', 6, 0, 0.25],
+      ['D', 'Front pocket height', 'Pocket zip to pocket base', 8, 0, 0.25],
+      ['E', 'Laptop sleeve', 'Inside height × width (fits 15″)', 15.5, 0, 0.25],
+      ['F', 'Shoulder strap length', 'Fully extended, top seam to buckle', 34, 0, 0.5],
+    ],
+  },
+};
+
+const DUFFEL_BODY = 'M62,206 C62,166 92,146 132,146 L368,146 C408,146 438,166 438,206 L444,424 C444,446 428,456 406,456 L94,456 C72,456 56,446 56,424 Z';
+const DUFFEL_SIDE: VectorArt = {
+  panels: [
+    { d: DUFFEL_BODY },
+    { d: 'M57,410 L443,410 L444,424 C444,446 428,456 406,456 L94,456 C72,456 56,446 56,424 Z', tone: -0.12 },
+    { d: 'M128,148 L154,148 L152,456 L124,456 Z', tone: -0.1 },
+    { d: 'M346,148 L372,148 L376,456 L348,456 Z', tone: -0.1 },
+  ],
+  ribs: [{ d: 'M90,160 C180,140 320,140 410,160', w: 6, tone: -0.2 }],
+  cords: [{ d: 'M141,150 C141,64 359,64 359,150', w: 16, tone: -0.1 }],
+  eyelets: [[76, 200], [424, 200]],
+  stitches: [
+    'M66,214 C66,176 94,158 132,156 L368,156 C406,158 434,176 434,214',
+    'M58,418 L442,418',
+    'M132,160 L130,450', 'M148,160 L147,450', 'M352,160 L353,450', 'M368,160 L370,450',
+  ],
+  folds: ['M90,260 C100,320 98,360 90,400', 'M410,260 C400,320 402,360 410,400'],
+};
+const DUFFEL_END: VectorArt = {
+  panels: [
+    { d: 'M150,190 C150,152 176,132 214,132 L286,132 C324,132 350,152 350,190 L352,412 C352,440 334,456 306,456 L194,456 C166,456 148,440 148,412 Z' },
+    { d: 'M149,412 L351,412 C352,440 334,456 306,456 L194,456 C166,456 148,440 148,412 Z', tone: -0.12 },
+  ],
+  ribs: [{ d: 'M172,250 L328,250', w: 5, tone: -0.2 }],
+  cords: [{ d: 'M318,252 L322,276', w: 4, tone: -0.3 }],
+  eyelets: [[250, 150]],
+  stitches: ['M158,194 C158,160 182,142 216,142 L284,142 C318,142 342,160 342,194 L344,404', 'M150,420 L350,420'],
+};
+
+const DUFFEL: GarmentDef = {
+  id: 'duffel',
+  name: 'Duffel Bag',
+  short: 'Duffel',
+  category: 'bags',
+  group: 'Packs',
+  spec: '600D recycled polyester · 40 L · wrap handles · detachable shoulder strap',
+  views: [
+    { id: 'front', label: 'Front', art: DUFFEL_SIDE, zone: zone(170, 200, 160, 160, 9, 9, 'Long side panel, centred between the handles') },
+    { id: 'back', label: 'Back', art: DUFFEL_SIDE, zone: zone(170, 200, 160, 160, 9, 9, 'Long side panel, centred between the handles') },
+    { id: 'end', label: 'End', art: DUFFEL_END, zone: zone(184, 280, 132, 110, 6.5, 5.4, 'End panel, below the pocket zip') },
+  ],
+  sizeChart: {
+    sizes: ['OS'],
+    base: 'OS',
+    points: [
+      ['A', 'Length', 'End to end along the base', 22, 0, 0.25],
+      ['B', 'Height', 'Base to top zip', 11, 0, 0.25],
+      ['C', 'Width', 'Across the end panel', 11, 0, 0.25],
+      ['D', 'Handle drop', 'Top of bag to top of handle', 6, 0, 0.25],
+      ['E', 'Shoulder strap length', 'Fully extended, clip to clip', 52, 0, 0.5],
+    ],
+  },
+};
+
+const BELTBAG: GarmentDef = {
+  id: 'beltbag',
+  name: 'Belt Bag',
+  short: 'Belt Bag',
+  category: 'bags',
+  group: 'Packs',
+  spec: 'Nylon ripstop · adjustable 1.5″ webbing strap · zip front pocket',
+  views: [
+    {
+      id: 'front',
+      label: 'Front',
+      art: {
+        behind: [
+          { d: 'M24,288 L120,272 L124,300 L28,318 Z', tone: -0.12 },
+          { d: 'M476,288 L380,272 L376,300 L472,318 Z', tone: -0.12 },
+        ],
+        panels: [
+          { d: 'M112,262 C150,226 350,226 388,262 C404,300 396,348 368,368 C300,394 200,394 132,368 C104,348 96,300 112,262 Z' },
+          { d: 'M126,318 C200,334 300,334 374,318 C372,340 362,356 350,364 C290,384 210,384 150,364 C138,356 128,340 126,318 Z', tone: -0.05 },
+          { d: 'M44,290 L70,286 L74,314 L48,318 Z', tone: -0.35 },
+        ],
+        ribs: [
+          { d: 'M120,264 C170,236 330,236 380,264', w: 5, tone: -0.2 },
+          { d: 'M130,320 C200,336 300,336 370,320', w: 4, tone: -0.2 },
+        ],
+        cords: [{ d: 'M362,256 L372,278', w: 4, tone: -0.3 }],
+        stitches: ['M120,268 C160,240 340,240 380,268', 'M136,362 C204,386 296,386 364,362'],
+      },
+      zone: zone(182, 270, 136, 44, 5.5, 1.8, 'Upper front panel, between the zips'),
+    },
+  ],
+  sizeChart: {
+    sizes: ['OS'],
+    base: 'OS',
+    points: [
+      ['A', 'Width', 'End to end across the body', 13, 0, 0.25],
+      ['B', 'Height', 'Base to top zip at centre', 5.5, 0, 0.125],
+      ['C', 'Depth', 'Front to back at centre', 2.5, 0, 0.125],
+      ['D', 'Strap length', 'Fully extended, buckle to buckle', 44, 0, 0.5],
+    ],
+  },
+};
+
+const DRAWSTRING_ART: VectorArt = {
+  panels: [
+    { d: 'M118,124 L382,124 L386,516 L114,516 Z' },
+    { d: 'M118,124 L382,124 L382,160 L118,160 Z', tone: -0.07 },
+    { d: 'M114,488 L144,516 L114,516 Z', tone: -0.2 },
+    { d: 'M386,488 L356,516 L386,516 Z', tone: -0.2 },
+  ],
+  cords: [
+    { d: 'M150,142 C98,240 96,400 120,506', w: 6, tone: 0.5 },
+    { d: 'M350,142 C402,240 404,400 380,506', w: 6, tone: 0.5 },
+    { d: 'M150,142 C200,104 300,104 350,142', w: 6, tone: 0.5 },
+  ],
+  eyelets: [[122, 500], [378, 500]],
+  stitches: ['M118,166 L382,166'],
+  folds: ['M180,200 C196,300 190,400 176,480', 'M320,200 C304,300 310,400 324,480'],
+};
+
+const DRAWSTRING: GarmentDef = {
+  id: 'drawstring',
+  name: 'Drawstring Bag',
+  short: 'Gym Sack',
+  category: 'bags',
+  group: 'Totes & sacks',
+  spec: '210D polyester · 14 × 18 in · cord drawstring with reinforced corners',
+  views: [
+    { id: 'front', label: 'Front', art: DRAWSTRING_ART, zone: zone(158, 206, 184, 220, 10, 12, 'Centred below the drawstring channel') },
+    { id: 'back', label: 'Back', art: DRAWSTRING_ART, zone: zone(158, 206, 184, 220, 10, 12, 'Centred below the drawstring channel') },
+  ],
+  sizeChart: {
+    sizes: ['OS'],
+    base: 'OS',
+    points: [
+      ['A', 'Width', 'Across the bag', 14, 0, 0.25],
+      ['B', 'Height', 'Base to top of channel', 18, 0, 0.25],
+      ['C', 'Channel height', 'Drawstring channel, top fold', 1.75, 0, 0.125],
+      ['D', 'Cord length', 'Each cord, end to end', 60, 0, 1],
+    ],
+  },
+};
+
+/* ------------------------------------------------------------------------- FOOTWEAR */
+
+/** Lateral (outside) view of a right shoe, toe to the right; ground at y 452, ~35.7 px per inch. */
+function sneakerSide(high: boolean): VectorArt {
+  const upper = high
+    ? 'M60,398 C52,330 54,250 64,184 C94,174 132,172 164,178 L176,186 C220,240 280,284 340,316 C392,334 440,354 458,382 C462,390 460,396 452,398 Z'
+    : 'M58,398 C50,352 52,318 68,300 C96,294 128,300 158,310 C172,296 184,276 196,258 L226,252 C262,270 300,294 340,316 C392,334 440,354 458,382 C462,390 460,396 452,398 Z';
+  const laces = high
+    ? [[196, 197, 186, 211], [221, 217, 211, 231], [245, 236, 235, 250], [269, 256, 259, 270], [293, 275, 283, 289], [318, 295, 308, 309]]
+    : [[213, 265, 224, 283], [239, 275, 246, 292], [265, 286, 268, 302], [291, 296, 289, 312], [317, 307, 311, 321]];
+  return {
+    behind: high
+      ? [{ d: 'M160,180 C162,152 180,146 196,154 L190,186 Z', tone: -0.04 }]
+      : [
+          { d: 'M192,262 C194,236 210,228 226,236 L236,258 Z', tone: -0.04 },
+          { d: 'M66,302 C100,292 140,298 160,310 L150,316 C120,306 92,302 70,308 Z', tone: -0.45, flat: true },
+        ],
+    panels: [
+      { d: upper },
+      high
+        ? { d: 'M60,398 C54,350 54,300 58,262 C80,262 100,266 112,272 C116,320 118,360 128,398 Z', tone: -0.07 }
+        : { d: 'M58,398 C50,352 52,318 68,300 C82,298 96,300 108,304 C112,336 116,368 126,398 Z', tone: -0.07 },
+      { d: 'M352,320 C398,336 442,356 458,382 C462,390 460,396 452,398 L384,398 C388,370 374,342 352,320 Z', tone: -0.05 },
+      high
+        ? { d: 'M166,180 L180,184 C222,238 282,282 342,314 L332,328 C272,296 214,252 170,198 Z', tone: -0.09 }
+        : { d: 'M196,258 L226,252 C262,270 300,294 340,316 L330,330 C292,308 254,286 210,276 Z', tone: -0.09 },
+      ...(high ? [{ d: 'M64,184 C94,174 132,172 164,178 L166,196 C134,190 96,192 66,202 Z', tone: -0.12 }] : []),
+      { d: 'M60,386 C150,384 300,382 456,386 L454,398 L58,398 Z', tone: -0.04 },
+      { d: 'M50,396 L458,396 C470,402 470,426 460,432 L60,434 C46,428 44,404 50,396 Z', tone: 0.9 },
+      { d: 'M60,434 L460,432 C464,444 456,452 442,452 L72,452 C60,452 54,444 60,434 Z', tone: -0.55 },
+      high
+        ? { d: 'M56,214 C52,198 58,184 70,182 L76,196 C68,198 62,204 60,216 Z', tone: -0.14 }
+        : { d: 'M54,316 C50,300 58,286 70,286 L76,300 C68,302 62,308 60,318 Z', tone: -0.14 },
+    ],
+    cords: laces.map(([x1, y1, x2, y2]) => ({ d: `M${x1},${y1} L${x2},${y2}`, w: 5, tone: 0.55 })),
+    eyelets: laces.map(([, , x2, y2]) => [x2, y2] as [number, number]),
+    stitches: [
+      'M64,392 C150,390 300,388 452,392',
+      high ? 'M114,276 C118,320 122,360 132,394' : 'M112,306 C116,338 120,368 130,394',
+      'M356,326 C380,346 390,372 388,394',
+      high ? 'M172,204 C216,256 274,298 328,334' : 'M212,282 C252,292 290,312 326,334',
+      'M56,414 L462,414',
+    ],
+    folds: ['M330,330 C340,340 350,352 354,364', 'M300,320 C312,330 320,342 324,352'],
+  };
+}
+
+/** Top view (toe at the bottom): tongue and lacing. */
+const SNEAKER_TOP: VectorArt = {
+  panels: [
+    { d: 'M250,48 C318,48 346,92 348,150 C352,232 362,322 356,402 C350,478 310,532 250,532 C190,532 150,478 144,402 C138,322 148,232 152,150 C154,92 182,48 250,48 Z', tone: 0.9 },
+    { d: 'M250,56 C312,56 336,96 338,150 C342,230 352,320 346,400 C340,470 304,522 250,522 C196,522 160,470 154,400 C148,320 158,230 162,150 C164,96 188,56 250,56 Z' },
+    { d: 'M200,92 C204,70 296,70 300,92 C304,120 298,140 290,150 L210,150 C202,140 196,120 200,92 Z', tone: -0.5, flat: true },
+    { d: 'M214,104 C216,84 284,84 286,104 L292,300 C270,308 230,308 208,300 Z', tone: -0.03 },
+    { d: 'M196,150 L214,150 L206,320 L186,326 Z', tone: -0.09 },
+    { d: 'M304,150 L286,150 L294,320 L314,326 Z', tone: -0.09 },
+    { d: 'M168,420 C200,400 300,400 332,420 C330,480 300,520 250,520 C200,520 170,480 168,420 Z', tone: -0.05 },
+  ],
+  cords: [170, 200, 230, 260, 290].map((y, i) => ({ d: `M${200 - i * 2},${y} L${300 + i * 2},${y}`, w: 6, tone: 0.55 })),
+  eyelets: [170, 200, 230, 260, 290].flatMap((y, i) => [[200 - i * 2, y], [300 + i * 2, y]] as Array<[number, number]>),
+  stitches: ['M174,426 C204,408 296,408 326,426'],
+};
+
+function sneakerHeel(high: boolean): VectorArt {
+  const top = high ? 70 : 128;
+  return {
+    panels: [
+      { d: `M168,${top + 42} C168,${top + 12} 200,${top} 250,${top} C300,${top} 332,${top + 12} 332,${top + 42} L344,424 L156,424 Z` },
+      { d: `M172,${top + 40} C176,${top + 20} 324,${top + 20} 328,${top + 40} C320,${top + 52} 180,${top + 52} 172,${top + 40} Z`, tone: -0.45, flat: true },
+      { d: 'M160,300 C200,286 300,286 340,300 L344,424 L156,424 Z', tone: -0.07 },
+      { d: `M228,${top} C228,${top - 12} 272,${top - 12} 272,${top} L270,${top + 82} L230,${top + 82} Z`, tone: -0.14 },
+      { d: 'M146,420 L354,420 L360,452 C360,466 344,470 326,470 L174,470 C156,470 140,466 140,452 Z', tone: 0.9 },
+      { d: 'M140,456 L360,456 C360,470 342,478 322,478 L178,478 C158,478 140,470 140,456 Z', tone: -0.55 },
+    ],
+    stitches: ['M164,304 C204,292 296,292 336,304', `M234,${top + 4} L234,${top + 78}`, `M266,${top + 4} L266,${top + 78}`],
+  };
+}
+
+function sneaker(id: string, name: string, short: string, high: boolean, spec: string): GarmentDef {
+  const side = sneakerSide(high);
+  const lateralZone = high ? zone(124, 262, 150, 100, 4.2, 2.8, 'Lateral quarter panel, below the ankle collar') : zone(132, 330, 170, 52, 4.75, 1.45, 'Lateral quarter panel, between the heel counter and the laces');
+  return {
+    id,
+    name,
+    short,
+    category: 'footwear',
+    group: 'Sneakers',
+    spec,
+    views: [
+      { id: 'lateral', label: 'Outside', art: side, zone: lateralZone },
+      { id: 'medial', label: 'Inside', art: mirrorArt(side), zone: mirrorZone(lateralZone, lateralZone.placement.replace('Lateral', 'Medial')) },
+      { id: 'tongue', label: 'Tongue', art: SNEAKER_TOP, zone: zone(222, 106, 56, 52, 1.5, 1.4, 'Tongue, above the first lace') },
+      { id: 'heel', label: 'Heel', art: sneakerHeel(high), zone: zone(200, 316, 100, 64, 1.9, 1.2, 'Heel counter, centred') },
+    ],
+    sizeChart: {
+      sizes: SHOE_SIZES,
+      base: 'US 9',
+      ladder: SHOE_LADDER,
+      points: [
+        ['A', 'Outsole length', 'Heel to toe along the outsole', 11.75, 0.1667, 0.125],
+        ['B', 'Outsole width', 'Across the ball of the foot', 4.25, 0.03, 0.0625],
+        ['C', 'Collar height', 'Insole to top of the collar at the heel', high ? 6.5 : 3.25, 0.03, 0.125],
+        ['D', 'Midsole height', 'Midsole at the heel', 1.25, 0, 0.0625],
+        ['E', 'Toe spring', 'Ground to toe tip', 0.6, 0, 0.0625],
+        ['F', 'Lace length', 'End to end', high ? 63 : 47, 0.25, 1],
+      ],
+    },
+  };
+}
+
+const LOWTOP = sneaker('low-top', 'Low-Top Sneaker', 'Low-Top', false, 'Leather or canvas upper · padded collar · vulcanised rubber cupsole');
+const HIGHTOP = sneaker('high-top', 'High-Top Sneaker', 'High-Top', true, 'Leather or canvas upper · padded ankle collar · rubber cupsole');
+
+const SLIDE_BED = 'M250,40 C326,40 356,104 354,190 C352,280 346,360 350,440 C354,508 312,530 250,530 C188,530 146,508 150,440 C154,360 148,280 146,190 C144,104 174,40 250,40 Z';
+const SLIDE_RIDGE = 'M250,64 C312,64 334,118 332,190 C330,280 326,360 330,438 C332,494 300,508 250,508 C200,508 168,494 170,438 C174,360 170,280 168,190 C166,118 188,64 250,64 Z';
+const SLIDES: GarmentDef = {
+  id: 'slides',
+  name: 'Slides',
+  short: 'Slides',
+  category: 'footwear',
+  group: 'Sandals',
+  spec: 'Moulded EVA footbed · one-piece strap · textured outsole',
+  views: [
+    {
+      id: 'strap',
+      label: 'Strap',
+      art: {
+        panels: [{ d: SLIDE_BED }, { d: 'M132,150 C196,126 304,126 368,150 L372,312 C304,292 196,292 128,312 Z', tone: -0.1 }],
+        stitches: [SLIDE_RIDGE],
+        folds: ['M160,160 C170,220 170,260 162,300', 'M340,160 C330,220 330,260 338,300'],
+      },
+      zone: zone(152, 176, 196, 98, 4, 2, 'Strap, centred'),
+    },
+    {
+      id: 'footbed',
+      label: 'Footbed',
+      art: { panels: [{ d: SLIDE_BED }, { d: SLIDE_RIDGE, tone: -0.05 }], stitches: ['M190,150 C220,140 280,140 310,150', 'M188,170 C220,160 280,160 312,170'] },
+      zone: zone(198, 340, 104, 104, 2.1, 2.1, 'Footbed heel (debossed or printed)'),
+    },
+  ],
+  sizeChart: {
+    sizes: SHOE_SIZES,
+    base: 'US 9',
+    ladder: SHOE_LADDER,
+    points: [
+      ['A', 'Footbed length', 'Heel to toe', 11.25, 0.1667, 0.125],
+      ['B', 'Footbed width', 'Across the forefoot', 4.3, 0.03, 0.0625],
+      ['C', 'Strap width', 'Front to back at the centre', 2.75, 0.03, 0.0625],
+      ['D', 'Footbed thickness', 'At the heel', 1.25, 0, 0.0625],
+    ],
+  },
+};
+
+/* ------------------------------------------------------------------------- HEADWEAR (more) */
+
+const SNAPBACK: GarmentDef = {
+  id: 'snapback',
+  name: 'Snapback Cap',
+  short: 'Snapback',
+  category: 'accessories',
+  group: 'Caps',
+  spec: 'Structured 6-panel · flat brim · adjustable snap closure',
+  views: [
+    {
+      id: 'front',
+      label: 'Front',
+      art: {
+        panels: [
+          { d: 'M108,334 C106,190 168,108 250,108 C332,108 394,190 392,334 Z' },
+          { d: 'M96,330 C150,316 350,316 404,330 C404,350 380,362 250,364 C120,362 96,350 96,330 Z', tone: -0.06 },
+        ],
+        seams: ['M250,110 L250,330', 'M247,110 Q170,170 150,330', 'M253,110 Q330,170 350,330'],
+        stitches: ['M110,340 C160,330 340,330 390,340', 'M120,350 C170,342 330,342 380,350', 'M243,116 L243,326', 'M257,116 L257,326'],
+        folds: ['M178,150 Q196,230 188,320', 'M322,150 Q304,230 312,320'],
+        buttons: [[250, 109, 8], [176, 200, 3.5], [324, 200, 3.5]],
+      },
+      zone: zone(160, 170, 180, 100, 5, 2.8, 'Structured front panels, centred'),
+    },
+    {
+      id: 'back',
+      label: 'Back',
+      art: {
+        panels: [
+          { d: 'M110,346 C110,190 176,124 250,124 C324,124 390,190 390,346 Z' },
+          { d: 'M190,346 C190,284 310,284 310,346 Z', tone: -0.42, flat: true },
+          { d: 'M180,318 L320,318 L320,336 L180,336 Z', tone: -0.1 },
+        ],
+        seams: ['M250,126 L250,286', 'M247,126 Q168,190 150,344', 'M253,126 Q332,190 350,344'],
+        buttons: [[200, 327, 4], [224, 327, 4], [248, 327, 4], [272, 327, 4], [296, 327, 4]],
+      },
+      zone: zone(190, 214, 120, 50, 3.3, 1.4, 'Back, above the snap closure'),
+    },
+  ],
+  sizeChart: {
+    sizes: ['OS'],
+    base: 'OS',
+    points: [
+      ['A', 'Head circumference', 'Inside sweatband, snap at middle setting', 23, 0, 0.25],
+      ['B', 'Crown height', 'Brim seam to top button (structured)', 4.25, 0, 0.125],
+      ['C', 'Brim length', 'Front seam to brim edge', 3, 0, 0.125],
+      ['D', 'Brim width', 'Side to side across the brim', 8.25, 0, 0.125],
+    ],
+  },
+};
+
+const BUCKET_ART: VectorArt = {
+  panels: [
+    { d: 'M152,320 C150,210 184,166 250,166 C316,166 350,210 348,320 Z' },
+    { d: 'M150,314 L350,314 C376,350 402,380 420,404 C360,428 140,428 80,404 C98,380 124,350 150,314 Z', tone: -0.04 },
+  ],
+  seams: ['M166,226 C206,212 294,212 334,226', 'M152,300 L348,300'],
+  stitches: ['M138,346 C200,352 300,352 362,346', 'M118,370 C190,380 310,380 382,370', 'M98,394 C180,406 320,406 402,394'],
+  eyelets: [[178, 250], [322, 250]],
+  folds: ['M190,180 C200,230 196,280 186,310', 'M310,180 C300,230 304,280 314,310'],
+};
+
+const BUCKET: GarmentDef = {
+  id: 'bucket-hat',
+  name: 'Bucket Hat',
+  short: 'Bucket',
+  category: 'accessories',
+  group: 'Hats',
+  spec: 'Cotton twill · stitched downward brim · vent eyelets',
+  views: [
+    { id: 'front', label: 'Front', art: BUCKET_ART, zone: zone(182, 224, 136, 70, 3.8, 2, 'Crown front, centred') },
+    { id: 'back', label: 'Back', art: BUCKET_ART, zone: zone(182, 224, 136, 70, 3.8, 2, 'Crown back, centred') },
+  ],
+  sizeChart: {
+    sizes: ['S', 'M', 'L', 'XL'],
+    base: 'M',
+    points: [
+      ['A', 'Head circumference', 'Inside the band', 22.75, 0.5, 0.25],
+      ['B', 'Crown height', 'Band seam to top', 3.25, 0, 0.125],
+      ['C', 'Brim width', 'Band seam to brim edge', 2.25, 0, 0.125],
+    ],
+  },
+};
+
 /* ------------------------------------------------------------------------- registry */
 
 export const BUILT_IN_GARMENTS: GarmentDef[] = [
@@ -1395,7 +1881,9 @@ export const BUILT_IN_GARMENTS: GarmentDef[] = [
   JOGGERS, SHORTS, CARGO,
   COACH, WORK,
   SOCCER_JERSEY, GK_JERSEY, TRAINING_TOP, SOCCER_SHORTS, SOCKS, BASE_LAYER, COMP_SHORTS,
-  TOTE, DADHAT, BEANIE,
+  BACKPACK, DUFFEL, BELTBAG, TOTE, DRAWSTRING,
+  LOWTOP, HIGHTOP, SLIDES,
+  DADHAT, SNAPBACK, BUCKET, BEANIE,
 ];
 
 const CUSTOM_SIZE_SEED: PomSeed[] = [

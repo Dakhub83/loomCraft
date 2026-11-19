@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { garmentShape, getView, garmentViews, hasView, zonePpi } from '../data/garments';
+import { GARMENT_W, garmentShape, getView, garmentViews, hasView, zonePpi } from '../data/garments';
 import { getFabric, type FabricDef } from '../data/fabrics';
 import type { GarmentId, ViewId } from '../types';
 import { BODY, arm, leg, torsoSection, type Limb } from './body';
@@ -653,17 +653,39 @@ function buildBottom(garment: GarmentId, spec: BottomSpec, c: Ctx): Omit<Garment
  * HEADWEAR & BAGS
  * ============================================================================================== */
 
-function buildDadHat(garment: GarmentId, c: Ctx): Omit<GarmentModel, 'group' | 'materials' | 'frame'> {
+interface CapSpec {
+  /** Crown radii (x, height, z). */
+  R: [number, number, number];
+  phi0: number;
+  /** How much the front panels sit lower and flatter (unstructured); negative = fuller, structured front. */
+  frontDip: number;
+  brimLen: number;
+  /** Brim angular span, degrees. */
+  brimSpan: number;
+  /** Brim curvature: overall droop and extra bend at the sides. */
+  brimDrop: number;
+  brimSideBend: number;
+  /** Height of each view's zone bottom above the brim seam. */
+  frontLift: number;
+  backLift: number;
+}
+
+const CAPS: Record<'dad' | 'snap', CapSpec> = {
+  dad: { R: [3.5, 3.85, 4.05], phi0: -0.24, frontDip: 0.06, brimLen: 2.85, brimSpan: 116, brimDrop: 0.12, brimSideBend: 0.55, frontLift: 0.55, backLift: 1.5 },
+  snap: { R: [3.62, 4.5, 4.12], phi0: -0.2, frontDip: -0.04, brimLen: 3.05, brimSpan: 124, brimDrop: 0.04, brimSideBend: 0.06, frontLift: 0.7, backLift: 1.9 },
+};
+
+function buildCap(garment: GarmentId, c: Ctx, spec: CapSpec): Omit<GarmentModel, 'group' | 'materials' | 'frame'> {
   const C = new THREE.Vector3(0, 65.55, 0.25);
-  const R = new THREE.Vector3(3.5, 3.85, 4.05);
-  const phi0 = -0.24;
+  const R = new THREE.Vector3(...spec.R);
+  const phi0 = spec.phi0;
   const crownPt = (th: number, phi: number) =>
     new THREE.Vector3(C.x + R.x * Math.cos(phi) * Math.sin(th), C.y + R.y * Math.sin(phi), C.z + R.z * Math.cos(phi) * Math.cos(th));
   const crownGeo = gridGeometry(
     (u, v) => {
       const th = u * Math.PI * 2;
       // unstructured: front panels sit a little lower and flatter
-      const phi = phi0 + v * (Math.PI / 2 - phi0) - 0.06 * Math.max(0, Math.cos(th)) * (1 - v);
+      const phi = phi0 + v * (Math.PI / 2 - phi0) - spec.frontDip * Math.max(0, Math.cos(th)) * (1 - v);
       const p = crownPt(th, Math.min(phi, Math.PI / 2 - 1e-4));
       return p;
     },
@@ -674,13 +696,13 @@ function buildDadHat(garment: GarmentId, c: Ctx): Omit<GarmentModel, 'group' | '
   // brim: curved, pre-bent downward at the sides
   const brimGeo = gridGeometry(
     (u, v) => {
-      const th = (u - 0.5) * THREE.MathUtils.degToRad(116);
+      const th = (u - 0.5) * THREE.MathUtils.degToRad(spec.brimSpan);
       const base = crownPt(th, phi0 - 0.01);
       // longest at the front, tapering to nothing where it meets the crown at the sides
-      const len = 2.85 * Math.pow(Math.max(0, Math.cos(th * 1.45)), 0.75);
+      const len = spec.brimLen * Math.pow(Math.max(0, Math.cos(th * (1.45 * 116) / spec.brimSpan)), 0.75);
       const out = new THREE.Vector3(Math.sin(th) * 0.3, 0, Math.cos(th)).normalize();
       const p = base.addScaledVector(out, v * len);
-      p.y -= 0.12 * v + 0.55 * Math.pow(Math.sin(th), 2) * v; // pre-curved: sides bend down
+      p.y -= spec.brimDrop * v + spec.brimSideBend * Math.pow(Math.sin(th), 2) * v; // pre-curved: sides bend down
       return p;
     },
     { cols: 64, rows: 12, inside: new THREE.Vector3(0, 70, 0) },
@@ -707,8 +729,8 @@ function buildDadHat(garment: GarmentId, c: Ctx): Omit<GarmentModel, 'group' | '
 
   const brimY = C.y + R.y * Math.sin(phi0);
   const anchors: GarmentModel['anchors'] = {};
-  if (hasView(garment, 'front')) anchors.front = anchor(crown, new THREE.Vector3(0, brimY + 0.55 + zoneSize(garment, 'front').h / 2, 12), FRONT, undefined, 3);
-  if (hasView(garment, 'back')) anchors.back = anchor(crown, new THREE.Vector3(0, brimY + 1.5 + zoneSize(garment, 'back').h / 2, -12), BACK, undefined, 3);
+  if (hasView(garment, 'front')) anchors.front = anchor(crown, new THREE.Vector3(0, brimY + spec.frontLift + zoneSize(garment, 'front').h / 2, 12), FRONT, undefined, 3);
+  if (hasView(garment, 'back')) anchors.back = anchor(crown, new THREE.Vector3(0, brimY + spec.backLift + zoneSize(garment, 'back').h / 2, -12), BACK, undefined, 3);
   return { anchors, trims: [], armAngle: 14, mannequin: true };
 }
 
@@ -833,11 +855,543 @@ function buildSocks(garment: GarmentId, c: Ctx): Omit<GarmentModel, 'group' | 'm
 }
 
 /* ================================================================================================
+ * BAGS & FOOTWEAR (standalone products: no mannequin; they stand on the floor at y = 0)
+ * ============================================================================================== */
+
+type Built = Omit<GarmentModel, 'group' | 'materials' | 'frame'>;
+
+const FOAM = getFabric('eva-foam')!;
+const shadeOf = (hex: string, k: number) => new THREE.Color(hex).multiplyScalar(k).getStyle();
+
+function solidMat(c: Ctx, color: string, roughness = 0.6, metalness = 0): THREE.MeshStandardMaterial {
+  const m = new THREE.MeshStandardMaterial({ color, roughness, metalness, clippingPlanes: c.clip });
+  c.materials.push(m);
+  return m;
+}
+
+/** A round tube through `pts` (zips, cords, laces). */
+function addTube(c: Ctx, pts: THREE.Vector3[], r: number, mat: THREE.Material, segments = 64) {
+  const m = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), segments, r, 8, false), mat);
+  m.castShadow = true;
+  c.group.add(m);
+  return m;
+}
+
+/** A flat strap (webbing) along `pts`: `thick` along the `normal` hint, `width` across it. */
+function addStrap(c: Ctx, pts: THREE.Vector3[], normal: THREE.Vector3, thick: number, width: number, color: string) {
+  const frames = curveFrames(new THREE.CatmullRomCurve3(pts), normal);
+  return addPart(c, tubeGeometry(frames, () => [thick / 2, width / 2], { cols: 12, rows: 64 }), c.fabric, { color });
+}
+
+/** Superellipse surface z (front, +) at x for half-width a, half-depth b. */
+const superZ = (x: number, a: number, b: number, n: number) => (Math.abs(x) >= a ? 0 : b * Math.pow(1 - Math.pow(Math.abs(x) / a, n), 1 / n));
+
+function buildBackpack(garment: GarmentId, c: Ctx): Built {
+  const W = 6;
+  const D = 3;
+  const H = 18;
+  const yd = H - 3.6;
+  const N = 3.2;
+  const sec = (y: number) => {
+    const k = y > yd ? Math.sqrt(Math.max(0, 1 - ((y - yd) / (H - yd)) ** 2)) : 1;
+    return { a: W * (1 - 0.05 * (y / H)) * k, b: D * (0.86 + 0.14 * Math.sin(Math.PI * Math.min(1, y / H))) * Math.sqrt(k) };
+  };
+  const shape = (z: number) => (z > 0 ? z * 1.12 : z * 0.88); // fuller front, flatter back
+  const body = addPart(
+    c,
+    gridGeometry(
+      (u, v) => {
+        const y = v * H;
+        const s = sec(y);
+        const p = superPoint(u * Math.PI * 2, s.a, s.b, N);
+        return new THREE.Vector3(p.x, y, shape(p.z));
+      },
+      { cols: 96, rows: 72, wrapU: true, inside: new THREE.Vector3(0, H / 2, 0) },
+    ),
+  );
+  addPart(
+    c,
+    gridGeometry(
+      (u, v) => {
+        const s = sec(0);
+        const p = superPoint(u * Math.PI * 2, s.a * (1 - v) + 0.01, s.b * (1 - v) + 0.01, N);
+        return new THREE.Vector3(p.x, 0, shape(p.z));
+      },
+      { cols: 64, rows: 6, inside: new THREE.Vector3(0, 5, 0) },
+    ),
+    c.fabric,
+    { color: shadeOf(c.color, 0.8) },
+  );
+  const frontZ = (x: number, y: number) => {
+    const s = sec(y);
+    return 1.12 * superZ(x, s.a, s.b, N);
+  };
+  const backZ = (x: number, y: number) => {
+    const s = sec(y);
+    return -0.88 * superZ(x, s.a, s.b, N);
+  };
+
+  // padded front pocket
+  const P = { x: 4.9, y0: 1.0, y1: 8.6 };
+  const bulge = (u: number, v: number) => 1.1 * Math.pow(Math.sin(Math.PI * u), 0.5) * Math.pow(Math.sin(Math.PI * v), 0.35) + 0.06;
+  const pocketPt = (u: number, v: number) => {
+    const x = (u - 0.5) * 2 * P.x;
+    const y = P.y0 + v * (P.y1 - P.y0);
+    return new THREE.Vector3(x, y, frontZ(x, y) + bulge(u, v));
+  };
+  const pocket = addPart(c, gridGeometry(pocketPt, { cols: 48, rows: 32, inside: new THREE.Vector3(0, 5, 0) }), c.fabric, { color: shadeOf(c.color, 0.94) });
+
+  // padded back panel
+  const pad = addPart(
+    c,
+    gridGeometry(
+      (u, v) => {
+        const x = (u - 0.5) * 2 * 4.6;
+        const y = 2.5 + v * (H - 6);
+        return new THREE.Vector3(x, y, backZ(x, y) - (0.45 * Math.pow(Math.sin(Math.PI * u), 0.4) * Math.pow(Math.sin(Math.PI * v), 0.4) + 0.04));
+      },
+      { cols: 40, rows: 40, inside: new THREE.Vector3(0, 9, 0) },
+    ),
+    c.fabric,
+    { color: shadeOf(c.color, 0.9) },
+  );
+
+  // zips and pulls
+  const zipMat = solidMat(c, '#1d1d20', 0.5);
+  const pullMat = solidMat(c, '#9ea2a8', 0.3, 0.85);
+  const zip: THREE.Vector3[] = [];
+  for (let i = 0; i <= 28; i++) {
+    const x = -5.4 + (i / 28) * 10.8;
+    const y = 12.9 + 1.5 * (1 - (x / 5.6) ** 2);
+    zip.push(new THREE.Vector3(x, y, frontZ(x, y) + 0.05));
+  }
+  addTube(c, zip, 0.07, zipMat);
+  addTube(c, Array.from({ length: 21 }, (_, i) => pocketPt(0.06 + (i / 20) * 0.88, 0.93).add(new THREE.Vector3(0, 0, 0.05))), 0.06, zipMat);
+  for (const p of [zip[24], pocketPt(0.86, 0.93)]) {
+    const tab = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.9, 0.08), pullMat);
+    tab.position.copy(p).add(new THREE.Vector3(0, -0.5, 0.12));
+    c.group.add(tab);
+  }
+
+  // shoulder straps and top handle
+  const strapColor = shadeOf(c.color, 0.72);
+  for (const s of [1, -1]) {
+    const zb = -D * 0.88;
+    addStrap(
+      c,
+      [
+        new THREE.Vector3(s * 2.3, H - 2.4, zb + 0.2),
+        new THREE.Vector3(s * 2.7, H - 5, zb - 2.0),
+        new THREE.Vector3(s * 3.2, 9, zb - 2.5),
+        new THREE.Vector3(s * 4.1, 3.2, zb - 1.4),
+        new THREE.Vector3(s * 4.5, 1.3, zb - 0.1),
+      ],
+      new THREE.Vector3(0, 0, -1),
+      0.55,
+      2.3,
+      strapColor,
+    );
+  }
+  addStrap(c, [new THREE.Vector3(-1.3, H - 0.4, -0.6), new THREE.Vector3(-0.9, H + 1.3, -0.6), new THREE.Vector3(0, H + 1.8, -0.6), new THREE.Vector3(0.9, H + 1.3, -0.6), new THREE.Vector3(1.3, H - 0.4, -0.6)], new THREE.Vector3(0, 0, 1), 0.25, 1.0, strapColor);
+
+  const anchors: Built['anchors'] = {};
+  if (hasView(garment, 'front')) anchors.front = anchor(body, new THREE.Vector3(zoneCx(garment, 'front'), P.y1 + 0.5 + zoneSize(garment, 'front').h / 2, 14), FRONT, undefined, 3);
+  if (hasView(garment, 'pocket')) anchors.pocket = anchor(pocket, new THREE.Vector3(zoneCx(garment, 'pocket'), (P.y0 + P.y1) / 2, 14), FRONT, undefined, 3);
+  if (hasView(garment, 'side')) anchors.side = anchor(body, new THREE.Vector3(14, 12.4, 0), new THREE.Vector3(-1, 0, 0), undefined, 3);
+  if (hasView(garment, 'back')) anchors.back = anchor(pad, new THREE.Vector3(0, H - 5, -14), BACK, undefined, 3);
+  return { anchors, trims: [], armAngle: 14, mannequin: false };
+}
+
+function buildDuffel(garment: GarmentId, c: Ctx): Built {
+  const L = 11;
+  const Wz = 5.5;
+  const Hh = 5.5;
+  const yc = Hh;
+  const ring = (x: number, th: number, grow = 0) => {
+    const k = 1 + 0.035 * Math.cos((x / L) * (Math.PI / 2));
+    const p = superPoint(th, Wz * k + grow, Hh * k + grow, 2.8);
+    return new THREE.Vector3(x, Math.max(0, yc + p.z), p.x);
+  };
+  const body = addPart(c, gridGeometry((u, v) => ring(-L + v * 2 * L, u * Math.PI * 2), { cols: 96, rows: 64, wrapU: true, inside: (_u, v) => new THREE.Vector3(-L + v * 2 * L, yc, 0) }));
+  const ends: Record<number, THREE.Mesh> = {};
+  for (const s of [1, -1]) {
+    ends[s] = addPart(
+      c,
+      gridGeometry(
+        (u, v) => {
+          const r = ring(s * L, u * Math.PI * 2);
+          const p = r.lerp(new THREE.Vector3(s * L, yc, 0), v);
+          p.x += s * 0.9 * Math.sin((v * Math.PI) / 2);
+          return p;
+        },
+        { cols: 96, rows: 14, inside: new THREE.Vector3(s * (L - 3), yc, 0) },
+      ),
+    );
+  }
+  const band = shadeOf(c.color, 0.78);
+  for (const xw of [-5.2, 5.2])
+    addPart(c, gridGeometry((u, v) => ring(xw - 0.6 + v * 1.2, u * Math.PI * 2, 0.06), { cols: 96, rows: 4, wrapU: true, inside: new THREE.Vector3(xw, yc, 0) }), c.fabric, { color: band });
+  for (const zs of [1, -1])
+    addStrap(
+      c,
+      [new THREE.Vector3(-5.2, yc + Hh - 0.2, zs * 1.1), new THREE.Vector3(-4.6, yc + Hh + 3.2, zs * 0.8), new THREE.Vector3(0, yc + Hh + 5, zs * 0.25), new THREE.Vector3(4.6, yc + Hh + 3.2, zs * 0.8), new THREE.Vector3(5.2, yc + Hh - 0.2, zs * 1.1)],
+      new THREE.Vector3(0, 0, zs),
+      0.3,
+      1.5,
+      band,
+    );
+  addTube(c, Array.from({ length: 31 }, (_, i) => ring(-L + 1.2 + (i / 30) * (2 * L - 2.4), 0).add(new THREE.Vector3(0, 0.05, 0))), 0.08, solidMat(c, '#1d1d20', 0.5));
+  const ringMat = solidMat(c, '#a9adb3', 0.3, 0.85);
+  for (const s of [1, -1]) {
+    const d = new THREE.Mesh(new THREE.TorusGeometry(0.7, 0.09, 10, 28), ringMat);
+    d.position.set(s * (L + 0.75), yc + Hh * 0.55, 0);
+    d.rotation.y = Math.PI / 2;
+    c.group.add(d);
+  }
+  const anchors: Built['anchors'] = {};
+  if (hasView(garment, 'front')) anchors.front = anchor(body, new THREE.Vector3(zoneCx(garment, 'front'), 6.2, 14), FRONT, undefined, 3);
+  if (hasView(garment, 'back')) anchors.back = anchor(body, new THREE.Vector3(-zoneCx(garment, 'back'), 6.2, -14), BACK, undefined, 3);
+  if (hasView(garment, 'end')) anchors.end = anchor(ends[1], new THREE.Vector3(L + 14, yc - 0.9, 0), new THREE.Vector3(-1, 0, 0), undefined, 3);
+  return { anchors, trims: [], armAngle: 14, mannequin: false };
+}
+
+function buildBeltBag(garment: GarmentId, c: Ctx): Built {
+  const L = 6.5;
+  const Hh = 2.75;
+  const Dz = 1.45;
+  const y0 = 6;
+  const yc = (x: number) => y0 + 0.55 * (x / L) ** 2;
+  const pt = (x: number, th: number, grow = 0) => {
+    const env = Math.pow(Math.max(0, 1 - (x / L) ** 2), 0.42);
+    const p = superPoint(th, Dz * env + grow, Hh * env + grow, 2.4);
+    return new THREE.Vector3(x, yc(x) + p.z, p.x > 0 ? p.x * 1.15 : p.x * 0.7);
+  };
+  const body = addPart(c, gridGeometry((u, v) => pt(-L + v * 2 * L, u * Math.PI * 2), { cols: 64, rows: 64, wrapU: true, inside: (_u, v) => new THREE.Vector3(-L + v * 2 * L, yc(-L + v * 2 * L), 0) }));
+  const zipMat = solidMat(c, '#1d1d20', 0.5);
+  addTube(c, Array.from({ length: 25 }, (_, i) => pt(-L + 1 + (i / 24) * (2 * L - 2), 0.75, 0.05)), 0.06, zipMat);
+  addTube(c, Array.from({ length: 21 }, (_, i) => pt(-L + 2.2 + (i / 20) * (2 * L - 4.4), 1.55, 0.05)), 0.05, zipMat);
+  const beltPts = [
+      new THREE.Vector3(L - 0.4, y0 + 0.4, -0.4),
+      new THREE.Vector3(L + 3.2, y0 + 0.6, -3),
+      new THREE.Vector3(L + 2, y0 + 0.6, -7.6),
+      new THREE.Vector3(0, y0 + 0.6, -9.4),
+      new THREE.Vector3(-L - 2, y0 + 0.6, -7.6),
+      new THREE.Vector3(-L - 3.2, y0 + 0.6, -3),
+      new THREE.Vector3(-L + 0.4, y0 + 0.4, -0.4),
+  ];
+  // a waist belt: 1.5 in tall along the frame's n (≈ up), thin across
+  addPart(c, tubeGeometry(curveFrames(new THREE.CatmullRomCurve3(beltPts), new THREE.Vector3(0, 1, 0)), () => [0.75, 0.1], { cols: 12, rows: 96 }), c.fabric, { color: shadeOf(c.color, 0.7) });
+  const buckle = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.8, 0.35), solidMat(c, '#222225', 0.45));
+  buckle.position.set(0, y0 + 0.6, -9.5);
+  c.group.add(buckle);
+  const anchors: Built['anchors'] = {};
+  if (hasView(garment, 'front')) anchors.front = anchor(body, new THREE.Vector3(zoneCx(garment, 'front'), y0 + 0.9, 14), FRONT, undefined, 2.5);
+  return { anchors, trims: [], armAngle: 14, mannequin: false };
+}
+
+function buildDrawstring(garment: GarmentId, c: Ctx): Built {
+  const W = 7;
+  const D = 1.0;
+  const H = 18;
+  const body = addPart(
+    c,
+    gridGeometry(
+      (u, v) => {
+        const y = v * H;
+        const g = smoothstep(H - 4, H, y);
+        const bulgeK = Math.sin(Math.PI * Math.min(1, v * 1.05));
+        const p = superPoint(u * Math.PI * 2, W * (1 + 0.015 * bulgeK) * (1 - 0.32 * g * g), D * (0.75 + 0.55 * bulgeK) * (1 + 0.9 * g), 6 - 3 * g);
+        // gathers under the drawstring channel
+        return new THREE.Vector3(p.x, y, p.z + 0.12 * Math.sin(u * Math.PI * 16) * g * Math.abs(Math.cos(u * Math.PI * 2)));
+      },
+      { cols: 120, rows: 60, wrapU: true, inside: new THREE.Vector3(0, H / 2, 0) },
+    ),
+  );
+  addPart(
+    c,
+    gridGeometry(
+      (u, v) => {
+        const p = superPoint(u * Math.PI * 2, W * 0.75 * v + 0.01, D * 0.75 * v + 0.01, 6);
+        return new THREE.Vector3(p.x, 0, p.z);
+      },
+      { cols: 64, rows: 6, inside: new THREE.Vector3(0, 5, 0) },
+    ),
+  );
+  const cord = solidMat(c, '#f1f0eb', 0.8);
+  for (const s of [1, -1])
+    addTube(c, [new THREE.Vector3(s * W * 0.6, H - 0.6, D * 1.2), new THREE.Vector3(s * W * 1.0, H * 0.62, D * 0.6), new THREE.Vector3(s * W * 1.0, 2.4, D * 0.4), new THREE.Vector3(s * W * 0.97, 0.7, 0.2)], 0.11, cord);
+  addTube(c, [new THREE.Vector3(-W * 0.6, H - 0.6, D * 1.2), new THREE.Vector3(0, H - 0.2, D * 1.6), new THREE.Vector3(W * 0.6, H - 0.6, D * 1.2)], 0.11, cord);
+  const anchors: Built['anchors'] = {};
+  if (hasView(garment, 'front')) anchors.front = anchor(body, new THREE.Vector3(zoneCx(garment, 'front'), 9.2, 14), FRONT, undefined, 3);
+  if (hasView(garment, 'back')) anchors.back = anchor(body, new THREE.Vector3(-zoneCx(garment, 'back'), 9.2, -14), BACK, undefined, 3);
+  return { anchors, trims: [], armAngle: 14, mannequin: false };
+}
+
+/* ---------- footwear: one parametric last (heel at -z, toe at +z, a right shoe: lateral side is -x) ---------- */
+
+interface ShoeLast {
+  L: number;
+  z: (t: number) => number;
+  halfW: (t: number) => number;
+  soleTop: (t: number) => number;
+  lift: (t: number) => number;
+}
+
+function shoeLast(L: number, widths: number[][]): ShoeLast {
+  const env = (t: number) =>
+    t < 0.06 ? Math.sqrt(Math.max(0, 1 - ((0.06 - t) / 0.06) ** 2)) : t > 0.9 ? Math.sqrt(Math.max(0, 1 - ((t - 0.9) / 0.1) ** 2)) : 1;
+  return {
+    L,
+    z: (t) => -L / 2 + t * L,
+    halfW: (t) => keyframes(widths, Math.min(1, Math.max(0, t)))[0] * env(t),
+    soleTop: (t) => keyframes([[0, 1.15], [0.6, 0.92], [1, 0.86]], Math.min(1, Math.max(0, t)))[0],
+    lift: (t) => 0.5 * Math.pow(smoothstep(0.76, 1, t), 1.6) + 0.12 * Math.pow(smoothstep(0.08, 0, t), 2),
+  };
+}
+
+/** Outsole + midsole for a last; returns the top height function. */
+function addSole(c: Ctx, last: ShoeLast, thickness: (t: number) => number, sideColor: string, bottomColor: string, grow = 0.14) {
+  // perimeter param: u 0..0.5 down the outer (+x) side heel→toe, 0.5..1 back up the inner side
+  const rim = (u: number) => {
+    const side = u < 0.5 ? 1 : -1;
+    const tt = (u < 0.5 ? u * 2 : 2 - u * 2) * 1.03 - 0.015;
+    const t = Math.min(1, Math.max(0, tt));
+    const w = (last.halfW(Math.min(1, Math.max(0.0001, tt))) * 1.07 + grow) * (tt < 0 || tt > 1 ? 0 : 1);
+    return { x: side * w, z: last.z(tt), t };
+  };
+  addPart(
+    c,
+    gridGeometry(
+      (u, v) => {
+        const r = rim(u);
+        const round = 1 - 0.05 * (1 - Math.sin(Math.PI * Math.min(1, v)));
+        return new THREE.Vector3(r.x * round, last.lift(r.t) + v * thickness(r.t), r.z);
+      },
+      { cols: 160, rows: 8, wrapU: true, inside: (u) => { const r = rim(u); return new THREE.Vector3(0, last.lift(r.t) + 0.4, r.z); } },
+    ),
+    FOAM,
+    { color: sideColor, inner: false },
+  );
+  for (const [top, color] of [[false, bottomColor], [true, sideColor]] as const)
+    addPart(
+      c,
+      gridGeometry(
+        (u, v) => {
+          const r = rim(u);
+          return new THREE.Vector3(r.x * (1 - v), last.lift(r.t) + (top ? thickness(r.t) : 0), r.z);
+        },
+        { cols: 160, rows: 6, inside: new THREE.Vector3(0, top ? -5 : 5, 0) },
+      ),
+      FOAM,
+      { color, inner: false },
+    );
+}
+
+function buildSneaker(garment: GarmentId, c: Ctx, high: boolean): Built {
+  const last = shoeLast(11.5, [[0, 1.4], [0.1, 1.62], [0.3, 1.66], [0.62, 2.02], [0.8, 1.98], [0.93, 1.62], [1, 1.3]]);
+  const H = (t: number) =>
+    keyframes(
+      high
+        ? [[0, 7.0], [0.12, 7.2], [0.22, 7.2], [0.27, 7.0], [0.3, 6.5], [0.4, 4.7], [0.5, 3.5], [0.65, 2.6], [0.85, 1.95], [1, 1.35]]
+        : [[0, 3.6], [0.12, 3.9], [0.25, 4.0], [0.3, 3.85], [0.33, 3.65], [0.45, 3.15], [0.65, 2.5], [0.85, 1.95], [1, 1.35]],
+      t,
+    )[0];
+  const collar = (t: number) => keyframes(high ? [[0, 6.4], [0.08, 6.3], [0.18, 6.0], [0.25, 6.25], [0.29, 6.55]] : [[0, 3.05], [0.08, 2.95], [0.2, 2.5], [0.27, 2.75], [0.31, 3.65]], t)[0];
+  const tOpen = high ? 0.29 : 0.31;
+  const base = (t: number) => last.lift(t) + last.soleTop(t);
+  // the toe rounds over instead of ending in a flat face
+  const height = (t: number) => H(t) * (t > 0.88 ? 0.42 + 0.58 * Math.sqrt(Math.max(0, 1 - ((t - 0.88) / 0.12) ** 2)) : 1);
+  const wall = (phi: number, t: number) => {
+    const s = Math.sin(phi);
+    const sx = Math.sign(s) * Math.pow(Math.abs(s), 0.65);
+    const sy = Math.pow(Math.abs(Math.cos(phi)), 0.5);
+    return new THREE.Vector3(last.halfW(t) * sx * (1 - 0.08 * sy), base(t) + height(t) * sy, last.z(t));
+  };
+  // Each row: outer wall up the left side (u 0..A), across the top (A..1-A), down the right side.
+  // In the collar opening the walls stop at the collar line, which therefore always lies on grid
+  // columns u = A and 1 - A (a clean rim), and the middle becomes the padded lining dipping inside.
+  const A = 0.3;
+  const PHI_TOP = 0.5;
+  const upperPt = (u: number, t: number) => {
+    const f = t < tOpen ? smoothstep(tOpen, tOpen - 0.06, t) : 0;
+    const rel = Math.min(1, Math.max(0, collar(t) / height(t)));
+    const phiRim = Math.acos(Math.min(1, rel * rel));
+    const phiW = PHI_TOP + (phiRim - PHI_TOP) * f;
+    if (u < A) return wall(-Math.PI / 2 + (u / A) * (Math.PI / 2 - phiW), t);
+    if (u > 1 - A) return wall(phiW + ((u - (1 - A)) / A) * (Math.PI / 2 - phiW), t);
+    const s = (u - A) / (1 - 2 * A);
+    const closed = wall(-phiW + 2 * phiW * s, t);
+    if (f <= 0) return closed;
+    const l = wall(-phiW, t);
+    const r = wall(phiW, t);
+    const depth = Math.max(0.3, l.y - base(t) - 0.35);
+    const open = new THREE.Vector3(l.x + (r.x - l.x) * s, l.y - depth * Math.pow(Math.sin(Math.PI * s), 0.6), last.z(t));
+    open.x *= 0.9;
+    return closed.lerp(open, f);
+  };
+  const upper = addPart(c, gridGeometry((u, v) => upperPt(u, v), { cols: 96, rows: 160, inside: (_u, v) => new THREE.Vector3(0, base(v) + 0.3, last.z(v)) }));
+  addSole(c, last, last.soleTop, '#f3f1ec', '#2b2b2e');
+
+  // laces across the throat
+  const laceMat = solidMat(c, '#f5f4ef', 0.75);
+  const n = high ? 7 : 5;
+  const t0 = high ? 0.31 : 0.345;
+  const t1 = 0.6;
+  for (let k = 0; k < n; k++) {
+    const t = t0 + (k / (n - 1)) * (t1 - t0);
+    const pts = Array.from({ length: 9 }, (_, i) => upperPt(0.5 + (i / 8 - 0.5) * 0.36, t).add(new THREE.Vector3(0, 0.1 + 0.06 * Math.sin((i / 8) * Math.PI), 0)));
+    addTube(c, pts, 0.075, laceMat, 24);
+  }
+  // heel pull tab
+  const tab = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.4, 0.22), fabricMaterial(c.fabric, shadeOf(c.color, 0.7), { clip: c.clip }));
+  c.materials.push(tab.material as THREE.Material);
+  tab.position.set(0, base(0) + collar(0) + 0.25, last.z(0) - 0.08);
+  tab.rotation.x = 0.12;
+  c.group.add(tab);
+
+  // anchors from the 2D side view (heel x 52 → toe x 462, ground y 452, ~35.7 px/in)
+  const anchors: Built['anchors'] = {};
+  const sideAnchor = (view: ViewId, sign: 1 | -1) => {
+    const z2 = getView(garment, view).zone;
+    const cx = view === 'medial' ? GARMENT_W - (z2.x + z2.w / 2) : z2.x + z2.w / 2;
+    const t = (cx - 52) / 410;
+    const h = (452 - (z2.y + z2.h / 2)) / 35.7;
+    anchors[view] = anchor(upper, new THREE.Vector3(sign * 14, h, last.z(t)), new THREE.Vector3(-sign, 0, 0), undefined, 2.2);
+  };
+  if (hasView(garment, 'lateral')) sideAnchor('lateral', -1);
+  if (hasView(garment, 'medial')) sideAnchor('medial', 1);
+  if (hasView(garment, 'tongue')) {
+    const t = tOpen + 0.02;
+    const p = upperPt(0.5, t);
+    const tan = upperPt(0.5, t + 0.01).sub(upperPt(0.5, t - 0.01)).normalize();
+    const normal = new THREE.Vector3(1, 0, 0).cross(tan).normalize();
+    if (normal.y < 0) normal.negate();
+    anchors.tongue = anchor(upper, p.clone().addScaledVector(normal, 10), normal.clone().negate(), tan.clone().negate(), 1.6);
+  }
+  if (hasView(garment, 'heel')) anchors.heel = anchor(upper, new THREE.Vector3(0, 2.5, last.z(0) - 14), BACK, undefined, 2);
+  return { anchors, trims: [], armAngle: 14, mannequin: false };
+}
+
+function buildSlides(garment: GarmentId, c: Ctx): Built {
+  const last = shoeLast(11.3, [[0, 1.55], [0.12, 1.75], [0.35, 1.75], [0.62, 2.1], [0.82, 2.1], [0.95, 1.75], [1, 1.5]]);
+  const flat: ShoeLast = { ...last, lift: () => 0 };
+  const thick = (t: number) => keyframes([[0, 1.25], [0.5, 1.0], [1, 0.85]], Math.min(1, Math.max(0, t)))[0];
+  addSole(c, flat, thick, c.color, shadeOf(c.color, 0.55), 0.05);
+  // contoured footbed top: raised rim, shallow dish
+  const rimPt = (u: number) => {
+    const side = u < 0.5 ? 1 : -1;
+    const t = u < 0.5 ? u * 2 : 2 - u * 2;
+    return { x: side * (flat.halfW(t) * 1.07 + 0.05), t };
+  };
+  const bed = addPart(
+    c,
+    gridGeometry(
+      (u, v) => {
+        const r = rimPt(u);
+        return new THREE.Vector3(r.x * (1 - v), thick(r.t) + 0.18 * (1 - v) ** 2 - 0.05 * v, flat.z(r.t));
+      },
+      { cols: 160, rows: 12, inside: new THREE.Vector3(0, -5, 0) },
+    ),
+    c.fabric,
+    { inner: false },
+  );
+  // arched strap over the forefoot
+  const strap = addPart(
+    c,
+    gridGeometry(
+      (u, v) => {
+        const t = 0.47 + v * 0.33;
+        const a = (u - 0.5) * Math.PI;
+        const w = flat.halfW(t) * 1.05;
+        const arch = 1.55 * (1 - 0.2 * ((v - 0.5) * 2) ** 2);
+        return new THREE.Vector3(w * Math.sin(a), thick(t) + 0.1 + arch * Math.pow(Math.cos(a), 0.8), flat.z(t));
+      },
+      { cols: 48, rows: 24, inside: new THREE.Vector3(0, 0.5, flat.z(0.63)) },
+    ),
+    c.fabric,
+    { color: shadeOf(c.color, 0.92) },
+  );
+  const anchors: Built['anchors'] = {};
+  const up = new THREE.Vector3(0, 0, 1);
+  if (hasView(garment, 'strap')) anchors.strap = anchor(strap, new THREE.Vector3(0, 16, flat.z(0.635)), new THREE.Vector3(0, -1, 0), up, 3);
+  if (hasView(garment, 'footbed')) anchors.footbed = anchor(bed, new THREE.Vector3(0, 16, flat.z(0.28)), new THREE.Vector3(0, -1, 0), up, 1.5);
+  return { anchors, trims: [], armAngle: 14, mannequin: false };
+}
+
+/* ---------- more headwear ---------- */
+
+function buildBucket(garment: GarmentId, c: Ctx): Built {
+  const C = new THREE.Vector3(0, 65.55, 0.25);
+  const base = C.y - 0.95;
+  const top = C.y + 4.05;
+  const ringAt = (v: number, th: number) => {
+    // tapers and rolls over into the top
+    const k = 1 - 0.1 * v - 0.1 * Math.pow(v, 4);
+    const p = superPoint(th, 3.9 * k, 4.4 * k, 2.2);
+    return new THREE.Vector3(C.x + p.x, base + v * (top - 0.4 - base), C.z + p.z);
+  };
+  const crown = addPart(c, gridGeometry((u, v) => ringAt(v, u * Math.PI * 2), { cols: 96, rows: 24, wrapU: true, inside: C }));
+  addPart(
+    c,
+    gridGeometry(
+      (u, v) => {
+        const r = ringAt(1, u * Math.PI * 2);
+        const p = r.lerp(new THREE.Vector3(C.x, top - 0.4, C.z), v);
+        p.y += 0.55 * Math.sin((v * Math.PI) / 2);
+        return p;
+      },
+      { cols: 96, rows: 10, inside: new THREE.Vector3(C.x, top - 3, C.z) },
+    ),
+  );
+  addPart(
+    c,
+    gridGeometry(
+      (u, v) => {
+        const p = superPoint(u * Math.PI * 2, 3.9 + 2.4 * v, 4.4 + 2.4 * v, 2.2);
+        return new THREE.Vector3(C.x + p.x, base - 1.45 * Math.pow(v, 1.2), C.z + p.z);
+      },
+      { cols: 120, rows: 10, wrapU: true, inside: new THREE.Vector3(C.x, base - 4, C.z) },
+    ),
+  );
+  const ringMat = solidMat(c, '#b6b9bd', 0.3, 0.85);
+  for (const s of [1, -1]) {
+    const p = ringAt(0.62, s * 0.95);
+    const n = new THREE.Vector3(p.x - C.x, 0, p.z - C.z).normalize();
+    const eye = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.05, 8, 20), ringMat);
+    eye.position.copy(p).addScaledVector(n, 0.04);
+    eye.lookAt(p.clone().add(n));
+    c.group.add(eye);
+  }
+  const anchors: Built['anchors'] = {};
+  const y = base + 0.45 + zoneSize(garment, 'front').h / 2;
+  if (hasView(garment, 'front')) anchors.front = anchor(crown, new THREE.Vector3(0, y, 12), FRONT, undefined, 3);
+  if (hasView(garment, 'back')) anchors.back = anchor(crown, new THREE.Vector3(0, y, -12), BACK, undefined, 3);
+  return { anchors, trims: [], armAngle: 14, mannequin: true };
+}
+
+/* ================================================================================================
  * Entry
  * ============================================================================================== */
 
+/** Builders for everything that isn't a parametric top or bottom. */
+const BUILDERS: Record<string, (garment: GarmentId, c: Ctx) => Omit<GarmentModel, 'group' | 'materials' | 'frame'>> = {
+  dadhat: (g, c) => buildCap(g, c, CAPS.dad),
+  snapback: (g, c) => buildCap(g, c, CAPS.snap),
+  'bucket-hat': buildBucket,
+  beanie: buildBeanie,
+  tote: buildTote,
+  backpack: buildBackpack,
+  duffel: buildDuffel,
+  beltbag: buildBeltBag,
+  drawstring: buildDrawstring,
+  'low-top': (g, c) => buildSneaker(g, c, false),
+  'high-top': (g, c) => buildSneaker(g, c, true),
+  slides: buildSlides,
+  'soccer-socks': buildSocks,
+};
+
 export function hasGarmentModel(garment: GarmentId): boolean {
-  return garment in TOPS || garment in BOTTOMS || garment === 'dadhat' || garment === 'beanie' || garment === 'tote' || garment === 'soccer-socks';
+  return garment in TOPS || garment in BOTTOMS || garment in BUILDERS;
 }
 
 export function buildGarmentModel(garment: GarmentId, color: string, fabric: FabricDef, clip: THREE.Plane[]): GarmentModel | null {
@@ -845,18 +1399,7 @@ export function buildGarmentModel(garment: GarmentId, color: string, fabric: Fab
   const group = new THREE.Group();
   group.name = 'garment';
   const c: Ctx = { color, fabric, clip, group, materials: [] };
-  const rest =
-    garment in TOPS
-      ? buildTop(garment, TOPS[garment], c)
-      : garment in BOTTOMS
-        ? buildBottom(garment, BOTTOMS[garment], c)
-        : garment === 'dadhat'
-          ? buildDadHat(garment, c)
-          : garment === 'beanie'
-            ? buildBeanie(garment, c)
-            : garment === 'soccer-socks'
-              ? buildSocks(garment, c)
-              : buildTote(garment, c);
+  const rest = garment in TOPS ? buildTop(garment, TOPS[garment], c) : garment in BOTTOMS ? buildBottom(garment, BOTTOMS[garment], c) : BUILDERS[garment](garment, c);
   group.updateMatrixWorld(true);
   const frame = new THREE.Box3().setFromObject(group);
   // Ignore views without an anchor (e.g. future views); they simply don't show in 3D.

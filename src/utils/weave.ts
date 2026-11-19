@@ -86,6 +86,19 @@ export function weaveHeight(w: WeaveKind, x: number, y: number): number {
       const d = Math.abs(fx) + Math.abs(fy);
       return Math.min(1, 0.35 + d * 1.6) + 0.05 * tnoise(x, y, 24, 10);
     }
+    case 'leather': {
+      // pebble grain: soft rounded cells of uneven size, with fine creases between them
+      const cells = 0.5 + 0.5 * tnoise(x, y, 10, 21);
+      const fine = 0.5 + 0.5 * tnoise(x, y, 26, 22);
+      const pebble = Math.pow(cells * 0.6 + fine * 0.4, 1.6);
+      return 0.35 + 0.5 * pebble + 0.06 * tnoise(x, y, 64, 23);
+    }
+    case 'suede':
+      // short velvety nap: soft, fine, directionless noise
+      return 0.5 + 0.22 * tnoise(x, y, 32, 31) + 0.18 * tnoise(x, y, 64, 32) + 0.1 * tnoise(x, y, 12, 33);
+    case 'foam':
+      // moulded foam skin: almost smooth, faint orange-peel
+      return 0.55 + 0.12 * tnoise(x, y, 16, 41) + 0.08 * tnoise(x, y, 40, 42);
     case 'mesh': {
       const n = 4;
       const fx = frac(x * n + (Math.floor(y * n) % 2 ? 0.5 : 0));

@@ -2,7 +2,7 @@
 export type GarmentId = string;
 /** Per-garment view id ('front', 'back', 'sleeve', 'left-leg', …). Each garment declares its own views. */
 export type ViewId = string;
-export type GarmentCategory = 'tops' | 'bottoms' | 'outerwear' | 'soccer' | 'accessories' | 'custom';
+export type GarmentCategory = 'tops' | 'bottoms' | 'outerwear' | 'soccer' | 'bags' | 'footwear' | 'accessories' | 'custom';
 export type PrintEffect = 'none' | 'screen' | 'puff' | 'vintage';
 
 /** Serialized Fabric.js canvas (canvas.toObject()). */
@@ -75,6 +75,8 @@ export interface MeasurePoint {
 export interface SizeChart {
   sizes: string[];
   baseSize: string;
+  /** Size ladder that grade steps are counted on (e.g. US shoe sizes). Absent = the apparel ladder. */
+  ladder?: string[];
   unit: SizeUnit;
   points: MeasurePoint[];
   includeInTechPack: boolean;
