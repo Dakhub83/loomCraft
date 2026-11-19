@@ -179,6 +179,8 @@ export default function Garment360({ name, garment, color, designs, effects, fab
     three.current = { renderer, scene, camera, controls, clip, keyTarget, built: null, builtKey: '', fit: null, tween: null, syncView };
 
     const resize = () => {
+      // an export owns the renderer size; end() re-applies the host size afterwards
+      if (capturing.current) return;
       const w = host.clientWidth;
       const h = host.clientHeight;
       renderer.setSize(w, h, false);
@@ -231,6 +233,9 @@ export default function Garment360({ name, garment, color, designs, effects, fab
   useEffect(() => {
     if (three.current) three.current.controls.autoRotate = spin;
   }, [spin]);
+
+  // closing the preview (from anywhere in the app) cancels a running export
+  useEffect(() => () => spinAbort.current?.abort(), []);
 
   /* ---------- (re)build when the design, fabric or mode changes ---------- */
   useEffect(() => {
@@ -365,9 +370,13 @@ export default function Garment360({ name, garment, color, designs, effects, fab
         return renderer.domElement;
       },
       end() {
+        // the window may have been resized during the export: size to the host as it is now
+        const host = hostRef.current;
+        const w = host?.clientWidth || saved.size.x;
+        const h = host?.clientHeight || saved.size.y;
         renderer.setPixelRatio(saved.ratio);
-        renderer.setSize(saved.size.x, saved.size.y, false);
-        camera.aspect = saved.aspect;
+        renderer.setSize(w, h, false);
+        camera.aspect = host ? w / Math.max(1, h) : saved.aspect;
         camera.updateProjectionMatrix();
         camera.position.copy(saved.position);
         camera.quaternion.copy(saved.quaternion);
@@ -493,7 +502,8 @@ export default function Garment360({ name, garment, color, designs, effects, fab
         />
       )}
       {spinJob.running && (
-        <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center bg-[#0a0a0c]/70 backdrop-blur-sm">
+        // blocks the toolbar and canvas (close, mode, fabric, orbit) while frames render; the panel (z-30) stays usable for Cancel
+        <div className="absolute inset-0 z-20 grid place-items-center bg-[#0a0a0c]/70 backdrop-blur-sm">
           <span className="flex items-center gap-2 rounded-lg bg-black/60 px-3 py-2 text-xs text-zinc-200">
             <Loader2 size={14} className="animate-spin text-violet-400" /> Rendering 360° mockup… {Math.round(spinJob.progress * 100)}%
           </span>

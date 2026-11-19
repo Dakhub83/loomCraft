@@ -411,12 +411,12 @@ export function spinViewerHtml(opts: { title: string; frames: string[]; width: n
   var resume = 0, last = 0, drag = null;
   function draw(i) { cur = ((i % N) + N) % N; var im = imgs[cur]; if (!im || !im.complete) return; ctx.clearRect(0, 0, cv.width, cv.height); ctx.drawImage(im, 0, 0, cv.width, cv.height); }
   FRAMES.forEach(function (src, i) { var im = new Image(); im.onload = function () { if (++ready === N) { document.getElementById('load').remove(); draw(0); requestAnimationFrame(loop); } }; im.src = src; imgs[i] = im; });
-  function loop(t) { if (playing && t - last >= MS) { last = t; draw(cur + 1); } requestAnimationFrame(loop); }
+  function loop(t) { if (playing && !drag && t - last >= MS) { last = t; draw(cur + 1); } requestAnimationFrame(loop); }
   function pause() { playing = false; clearTimeout(resume); resume = setTimeout(function () { playing = !matchMedia('(prefers-reduced-motion: reduce)').matches; }, 3500); }
   box.addEventListener('pointerdown', function (e) { drag = { x: e.clientX, f: cur }; box.setPointerCapture(e.pointerId); pause(); });
   box.addEventListener('pointermove', function (e) { if (!drag) return; var per = box.clientWidth / N * 1.6; draw(drag.f - Math.round((e.clientX - drag.x) / per)); });
   box.addEventListener('pointerup', function () { drag = null; pause(); });
-  box.addEventListener('pointercancel', function () { drag = null; });
+  box.addEventListener('pointercancel', function () { drag = null; pause(); });
   box.addEventListener('keydown', function (e) { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); pause(); draw(cur + (e.key === 'ArrowRight' ? 1 : -1)); } });
 })();
 </script>
