@@ -129,22 +129,22 @@ export function buildMannequin(armAngle: number, clip: THREE.Plane[]): THREE.Gro
 
   for (const side of [1, -1] as const) {
     const a = arm(side, armAngle);
-    g.add(new THREE.Mesh(tubeGeometry(straightFrames(a.at(-1.5), a.at(a.length)), (v) => a.radius(-1.5 + v * (a.length + 1.5)), { cols: 28, rows: 24 }), mat));
+    g.add(new THREE.Mesh(tubeGeometry(straightFrames(a.at(-0.3), a.at(a.length)), (v) => a.radius(-0.3 + v * (a.length + 0.3)), { cols: 28, rows: 24 }), mat));
     const hand = new THREE.SphereGeometry(1, 24, 16);
     hand.scale(0.85, 3.2, 1.6);
     const hp = a.at(a.length + 3);
     hand.applyMatrix4(new THREE.Matrix4().makeRotationZ(Math.atan2(a.dir.x, -a.dir.y)));
     hand.translate(hp.x, hp.y, hp.z);
     g.add(new THREE.Mesh(hand, mat));
-    const shoulder = new THREE.SphereGeometry(a.radius(0), 24, 16);
-    shoulder.translate(a.top.x, a.top.y, a.top.z);
+    const shoulder = new THREE.SphereGeometry(a.radius(0) * 0.88, 24, 16);
+    shoulder.translate(a.top.x - side * 0.35, a.top.y - 0.45, a.top.z);
     g.add(new THREE.Mesh(shoulder, mat));
 
     const l = leg(side);
-    g.add(new THREE.Mesh(tubeGeometry(straightFrames(l.at(-2), l.at(l.length)), (v) => l.radius(-2 + v * (l.length + 2)), { cols: 32, rows: 40 }), mat));
+    g.add(new THREE.Mesh(tubeGeometry(straightFrames(l.at(-2), l.at(l.length + 1.8)), (v) => l.radius(-2 + v * (l.length + 3.8)), { cols: 32, rows: 40 }), mat));
     const foot = new THREE.SphereGeometry(1, 24, 16);
-    foot.scale(1.8, 1.4, 5);
-    foot.translate(l.at(l.length).x, 1.3, 2.4);
+    foot.scale(1.6, 1.15, 4.7);
+    foot.translate(l.at(l.length).x, 1.15, 2.3);
     g.add(new THREE.Mesh(foot, mat));
   }
   g.traverse((o) => {

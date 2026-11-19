@@ -9,6 +9,7 @@ import {
   ImagePlus,
   Italic,
   Plus,
+  Shirt,
   Sparkles,
   Type,
   Underline,
@@ -17,6 +18,7 @@ import {
 import type { CustomGarmentRecord, GarmentId, PrintEffect, SelectionInfo, ViewId } from '../types';
 import { garmentViews, getZone, hasView, viewLabel } from '../data/garments';
 import { GarmentPicker } from './GarmentPicker';
+import { FabricPicker } from './FabricPicker';
 import type { DesignCanvasHandle, TextStyle } from './DesignCanvas';
 import { GARMENT_SWATCHES, nearestPantone, normalizeHex } from '../utils/color';
 import { CURATED_FONTS, loadGoogleFont } from '../utils/fonts';
@@ -46,6 +48,9 @@ interface Props {
   onInfo(msg: string): void;
   /** Opens the Photoshop import dialog. */
   onImportPsd(file: File): void;
+  /** Explicit fabric for the current garment (undefined = its default). */
+  fabricId: string | undefined;
+  onFabric(id: string | null): void;
 }
 
 export function Section({ title, icon, children, right }: { title: string; icon: ReactNode; children: ReactNode; right?: ReactNode }) {
@@ -192,6 +197,11 @@ export function Toolbar(p: Props) {
             ≈ {pantone.name.replace('PANTONE ', 'PMS ')}
           </span>
         </div>
+      </Section>
+
+      {/* Fabric */}
+      <Section title="Fabric" icon={<Shirt size={14} />}>
+        <FabricPicker garment={p.garment} color={p.color} fabricId={p.fabricId} onFabric={p.onFabric} />
       </Section>
 
       {/* View */}

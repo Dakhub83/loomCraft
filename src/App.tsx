@@ -1,5 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CheckCircle2, Loader2, Maximize2, Minus, Plus, Rotate3d, XCircle } from 'lucide-react';
+import { CheckCircle2, Loader2, Maximize2, Minus, PersonStanding, Plus, Rotate3d, XCircle } from 'lucide-react';
 import { Header, LoomCraftLogo } from './components/Header';
 import { Toolbar } from './components/Toolbar';
 import { LayersPanel, PropertiesPanel } from './components/LayersPanel';
@@ -25,9 +25,11 @@ import type { StudioSnapshot } from './utils/exportTools';
 import { refitDesign } from './utils/fabricHelpers';
 import type { PlacementPreset } from './utils/placements';
 import { defaultSizeChart } from './utils/sizeCharts';
+import { fabricFor } from './data/fabrics';
 
 // Three.js lives in this chunk; it loads the first time the 360° preview opens.
 const Garment360 = lazy(() => import('./components/Garment360'));
+const MannequinViewport = lazy(() => import('./components/MannequinViewport'));
 const PsdImportDialog = lazy(() => import('./components/PsdImportDialog'));
 import {
   deleteCustomGarment,
@@ -92,6 +94,7 @@ function Studio({ initial, initialCustoms }: { initial: Workspace | null; initia
   const [sizeChartOpen, setSizeChartOpen] = useState(false);
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [show360, setShow360] = useState(false);
+  const [showMannequin, setShowMannequin] = useState(false);
   const [psdFile, setPsdFile] = useState<File | null>(null);
   const closePsd = useCallback(() => setPsdFile(null), []);
   const close360 = useCallback(() => setShow360(false), []);
@@ -342,7 +345,7 @@ function Studio({ initial, initialCustoms }: { initial: Workspace | null; initia
     mockupJpeg: async () => {
       const { composeMockup } = await import('./utils/exportTools');
       const s = stateRef.current;
-      const c = await composeMockup({ garment: s.garment, view: s.view, color: s.color, json: s.designs[s.view], effect: effectFor(s.effects, s.view), scale: 2 });
+      const c = await composeMockup({ garment: s.garment, view: s.view, color: s.color, json: s.designs[s.view], effect: effectFor(s.effects, s.view), scale: 2, fabric: fabricFor(s.fabrics, s.garment).id });
       return c.toDataURL('image/jpeg', 0.85).split(',')[1];
     },
   };
@@ -454,6 +457,7 @@ function Studio({ initial, initialCustoms }: { initial: Workspace | null; initia
 
   /* ---------------- derived ---------------- */
   const zone = getZone(garment, view);
+  const fabric = fabricFor(fabrics, garment);
   const viewsWithArtList = useMemo(
     () => garmentViews(garment).map((v) => v.id).filter((v) => hasArtwork(designs[v])),
     // customList: a custom garment's views can change when it's edited
@@ -531,6 +535,8 @@ function Studio({ initial, initialCustoms }: { initial: Workspace | null; initia
           onError={onError}
           onInfo={onInfo}
           onImportPsd={setPsdFile}
+          fabricId={fabrics[garment]}
+          onFabric={changeFabric}
         />
 
         {/* ---------------- stage ---------------- */}
@@ -542,7 +548,7 @@ function Studio({ initial, initialCustoms }: { initial: Workspace | null; initia
                 style={{ width: GARMENT_W, height: GARMENT_H, transform: `scale(${scale})` }}
               >
                 {/* Own compositor layer: canvas redraws never repaint the (filter-heavy) garment SVG. */}
-                <GarmentSVG garment={garment} view={view} color={color} className="absolute inset-0 [contain:strict] [transform:translateZ(0)]" />
+                <GarmentSVG garment={garment} view={view} color={color} fabric={fabric.id} className="absolute inset-0 [contain:strict] [transform:translateZ(0)]" />
 
                 {showZone && (
                   <div
@@ -576,16 +582,38 @@ function Studio({ initial, initialCustoms }: { initial: Workspace | null; initia
             </div>
 
             {!show360 && (
-              <button
-                onClick={() => {
-                  canvasRef.current?.selectLayers([]);
-                  setShow360(true);
-                }}
-                className="lc-btn absolute right-3 top-3 z-10 h-8 gap-1.5 border-violet-500/40 bg-[#111114]/90 px-3 text-xs text-violet-200 backdrop-blur hover:border-violet-400"
-                title="Rotate the garment in 3D and look inside it"
+              <div className="absolute right-3 top-3 z-10 flex gap-1.5">
+                <button
+                  onClick={() => setShowMannequin(true)}
+                  className="lc-btn h-8 gap-1.5 bg-[#111114]/90 px-3 text-xs text-zinc-300 backdrop-blur hover:text-zinc-100"
+                  title="Mannequin Studio: sized mannequin, studio lighting, test-fit a tee or hoodie, load .glb models"
+                >
+                  <PersonStanding size={14} /> Mannequin
+                </button>
+                <button
+                  onClick={() => {
+                    canvasRef.current?.selectLayers([]);
+                    setShow360(true);
+                  }}
+                  className="lc-btn h-8 gap-1.5 border-violet-500/40 bg-[#111114]/90 px-3 text-xs text-violet-200 backdrop-blur hover:border-violet-400"
+                  title="Rotate the garment in 3D and look inside it"
+                >
+                  <Rotate3d size={14} /> 360° View
+                </button>
+              </div>
+            )}
+            {showMannequin && (
+              <Suspense
+                fallback={
+                  <div className="fixed inset-0 z-50 grid place-items-center bg-[#0a0a0c] text-xs text-zinc-400">
+                    <span className="flex items-center gap-2">
+                      <Loader2 size={14} className="animate-spin text-violet-400" /> Loading Mannequin Studio…
+                    </span>
+                  </div>
+                }
               >
-                <Rotate3d size={14} /> 360° View
-              </button>
+                <MannequinViewport initialColor={color} onClose={() => setShowMannequin(false)} />
+              </Suspense>
             )}
             {show360 && (
               <Suspense
@@ -615,7 +643,7 @@ function Studio({ initial, initialCustoms }: { initial: Workspace | null; initia
           {/* status bar */}
           <div className="flex h-10 shrink-0 items-center gap-4 border-t border-white/[0.06] bg-[#0d0d10] px-4 text-[11px] text-zinc-500">
             <span className="truncate whitespace-nowrap">
-              <span className="text-zinc-300">{getGarment(garment).name}</span> · {viewLabel(garment, view)} · {effectName(effectFor(effects, view))}
+              <span className="text-zinc-300">{getGarment(garment).name}</span> · {fabric.name} · {viewLabel(garment, view)} · {effectName(effectFor(effects, view))}
             </span>
             <label className="flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap">
               <input type="checkbox" checked={showZone} onChange={(e) => setShowZone(e.target.checked)} className="accent-violet-500" />

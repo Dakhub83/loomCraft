@@ -3,11 +3,12 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { StaticCanvas, type FabricObject } from 'fabric';
 import { jsPDF } from 'jspdf';
 import { GarmentSVG } from '../components/GarmentTemplates';
-import { GARMENT_H, GARMENT_W, getGarment, getView, getZone, garmentViews, viewLabel, zonePpi } from '../data/garments';
+import { GARMENT_H, GARMENT_W, garmentShape, getGarment, getView, getZone, garmentViews, viewLabel, zonePpi } from '../data/garments';
 import type { CanvasJSON, FabricChoices, GarmentId, ManufacturingSpecs, PrintEffect, PrintZone, SizeChart, SizeCharts, ViewDesigns, ViewEffects, ViewId } from '../types';
 import { chartToCSV, defaultSizeChart, formatMeasure, measureOverlayMarkup, validateChart } from './sizeCharts';
 import { effectFor, hasArtwork } from '../types';
 import { extractPalette, hexToRgb, isDark, nearestPantone, normalizeHex } from './color';
+import { fabricFor } from '../data/fabrics';
 import { ensureFonts } from './fonts';
 import { effectName, ensureFilterInDocument } from './printEffects';
 import { objectKind, objectName } from './fabricHelpers';
@@ -52,8 +53,8 @@ export { hasArtwork };
 
 /* --------------------------------------------------------- garment raster */
 
-export function garmentMarkup(garment: GarmentId, view: ViewId, color: string, uid = 'lcx'): string {
-  return renderToStaticMarkup(createElement(GarmentSVG, { garment, view, color, uid }));
+export function garmentMarkup(garment: GarmentId, view: ViewId, color: string, uid = 'lcx', fabric?: string): string {
+  return renderToStaticMarkup(createElement(GarmentSVG, { garment, view, color, uid, fabric }));
 }
 
 async function loadImage(src: string): Promise<HTMLImageElement> {
@@ -69,10 +70,10 @@ async function loadImage(src: string): Promise<HTMLImageElement> {
  * blanks are fitted (contain), tinted with the canvas `multiply`/`overlay` composite op and then
  * masked back to the photo's alpha – the same result as the studio's CSS blend preview.
  */
-export async function drawGarment(ctx: CanvasRenderingContext2D, garment: GarmentId, view: ViewId, color: string, w: number, h: number) {
+export async function drawGarment(ctx: CanvasRenderingContext2D, garment: GarmentId, view: ViewId, color: string, w: number, h: number, fabric?: string) {
   const v = getView(garment, view);
   if (v.art) {
-    ctx.drawImage(await svgToImage(garmentMarkup(garment, view, color, `lcx-${view}`)), 0, 0, w, h);
+    ctx.drawImage(await svgToImage(garmentMarkup(garment, view, color, `lcx-${view}`, fabric)), 0, 0, w, h);
     return;
   }
   if (!v.image) return;
@@ -216,6 +217,8 @@ export async function composeMockup(opts: {
   effect: PrintEffect;
   scale: number;
   watermark?: boolean;
+  /** Fabric id (weave drawn on the garment). */
+  fabric?: string;
 }): Promise<HTMLCanvasElement> {
   const { garment, view, color, json, effect, scale } = opts;
   const out = document.createElement('canvas');
@@ -229,7 +232,7 @@ export async function composeMockup(opts: {
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, out.width, out.height);
 
-  await drawGarment(ctx, garment, view, color, out.width, out.height);
+  await drawGarment(ctx, garment, view, color, out.width, out.height, opts.fabric);
 
   if (json && hasArtwork(json)) {
     const zone = getZone(garment, view);
@@ -267,7 +270,7 @@ export interface TurntableSide {
  * view, or a blank copy of the front when the garment has no back view.
  */
 export async function buildTurntableTextures(
-  s: Pick<StudioSnapshot, 'garment' | 'color' | 'designs' | 'effects'>,
+  s: Pick<StudioSnapshot, 'garment' | 'color' | 'designs' | 'effects' | 'fabrics'>,
   scale = 2,
 ): Promise<{ front: TurntableSide; back: TurntableSide }> {
   const views = garmentViews(s.garment);
@@ -275,8 +278,7 @@ export async function buildTurntableTextures(
   const backView = views.find((v) => v.id === 'back');
   const sameBlank = (a: (typeof views)[number], b: (typeof views)[number]) => (!!a.art && a.art === b.art) || (!!a.image && a.image === b.image);
   const frontArt = views.filter((v) => v.id !== 'back' && sameBlank(v, frontView));
-  const category = getGarment(s.garment).category;
-  const labelled = category === 'tops' || category === 'outerwear';
+  const labelled = garmentShape(s.garment) === 'top';
 
   const side = async (base: (typeof views)[number], artViews: typeof views, neckLabel: boolean): Promise<TurntableSide> => {
     const W = Math.round(GARMENT_W * scale);
@@ -289,7 +291,7 @@ export async function buildTurntableTextures(
     };
 
     const [garmentC, g] = mk();
-    await drawGarment(g, s.garment, base.id, s.color, W, H);
+    await drawGarment(g, s.garment, base.id, s.color, W, H, fabricFor(s.fabrics, s.garment).id);
 
     const [artC, a] = mk();
     for (const v of artViews) {
@@ -413,6 +415,7 @@ export async function exportMockupPNG(s: StudioSnapshot): Promise<void> {
     effect: effectFor(s.effects, s.view),
     scale: MOCKUP_SCALE,
     watermark: true,
+    fabric: fabricFor(s.fabrics, s.garment).id,
   });
   downloadBlob(await canvasToBlob(canvas), `${slugify(s.name)}-${s.view}-mockup.png`);
 }
@@ -428,6 +431,7 @@ export async function makeThumbnail(s: Omit<StudioSnapshot, 'view' | 'name' | 'd
     json: s.designs[view],
     effect: effectFor(s.effects, view),
     scale: 0.4,
+    fabric: fabricFor(s.fabrics, s.garment).id,
   });
   return c.toDataURL('image/jpeg', 0.75);
 }
@@ -550,6 +554,7 @@ export async function exportProductionZip(
       effect: effectFor(s.effects, view),
       scale: MOCKUP_SCALE,
       watermark: true,
+      fabric: fabricFor(s.fabrics, s.garment).id,
     });
     mockupCanvases.set(view, canvas);
     const name = `mockups/${slug}-${view}-mockup.png`;
@@ -729,7 +734,13 @@ function buildTechPack(s: StudioSnapshot, reports: ViewReport[], spec: { chart: 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
   setText(MUTED);
-  doc.text(`${garment.name}  —  ${mfg ? `${mfg.fabricWeight} · ${mfg.composition}` : garment.spec}`.split('\n')[0].slice(0, 120), M, y + 14);
+  const chosen = s.fabrics?.[s.garment] ? fabricFor(s.fabrics, s.garment) : null;
+  const fabricLine = mfg
+    ? `${mfg.fabricWeight} · ${mfg.composition}`
+    : chosen
+      ? `${chosen.name}${chosen.gsm ? ` ${chosen.gsm} GSM` : ''} · ${chosen.composition}`
+      : garment.spec;
+  doc.text(`${garment.name}  —  ${fabricLine}`.split('\n')[0].slice(0, 120), M, y + 14);
 
   const bodyPantone = nearestPantone(s.color);
   swatch(s.color, W - M - 150, y - 16, 26);

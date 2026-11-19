@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { getGarment, getView, garmentViews, hasView, zonePpi } from '../data/garments';
+import { garmentShape, getView, garmentViews, hasView, zonePpi } from '../data/garments';
 import { getFabric, type FabricDef } from '../data/fabrics';
 import type { GarmentId, ViewId } from '../types';
 import { BODY, arm, leg, torsoSection, type Limb } from './body';
@@ -58,8 +58,9 @@ interface Ctx {
 const RIB = getFabric('rib')!;
 
 /** Outer (front-face) + inner (back-face) meshes for one surface; returns the outer mesh. */
-function addPart(c: Ctx, geom: THREE.BufferGeometry, fabric: FabricDef = c.fabric, opts: { tileScale?: number; inner?: boolean } = {}): THREE.Mesh {
-  const outer = fabricMaterial(fabric, c.color, { clip: c.clip, tileScale: opts.tileScale });
+function addPart(c: Ctx, geom: THREE.BufferGeometry, fabric: FabricDef = c.fabric, opts: { tileScale?: number; inner?: boolean; color?: string } = {}): THREE.Mesh {
+  const color = opts.color ?? c.color;
+  const outer = fabricMaterial(fabric, color, { clip: c.clip, tileScale: opts.tileScale });
   const mesh = new THREE.Mesh(geom, outer);
   mesh.castShadow = true;
   mesh.receiveShadow = true;
@@ -67,7 +68,7 @@ function addPart(c: Ctx, geom: THREE.BufferGeometry, fabric: FabricDef = c.fabri
   c.group.add(mesh);
   c.materials.push(outer);
   if (opts.inner !== false) {
-    const innerMat = fabricMaterial(fabric, c.color, { clip: c.clip, side: THREE.BackSide, inside: true, tileScale: opts.tileScale });
+    const innerMat = fabricMaterial(fabric, color, { clip: c.clip, side: THREE.BackSide, inside: true, tileScale: opts.tileScale });
     const inner = new THREE.Mesh(geom, innerMat);
     inner.receiveShadow = true;
     inner.userData.part = 'inner';
@@ -147,7 +148,7 @@ interface TopSpec {
   fit: number;
   flare: number;
   drop: number;
-  neck: 'crew' | 'polo' | 'hood' | 'collar' | 'tank';
+  neck: 'crew' | 'vneck' | 'mock' | 'polo' | 'hood' | 'collar' | 'tank';
   frontDrop: number;
   backDrop: number;
   neckW: number;
@@ -155,7 +156,9 @@ interface TopSpec {
   armAngle: number;
   hemBand: number;
   folds: number;
-  front?: 'zip' | 'snaps' | 'buttons' | 'placket';
+  front?: 'zip' | 'halfzip' | 'snaps' | 'buttons' | 'placket';
+  /** Padded elbows (goalkeeper jerseys). */
+  pads?: boolean;
   pocket?: 'kangaroo' | 'split' | 'chest-flaps';
   drawcordHem?: boolean;
   /** Print zones: distance from HPS to the top of each view's zone. */
@@ -173,6 +176,10 @@ const TOPS: Record<string, TopSpec> = {
   crewneck: { ease: 2.8, hemY: 30, fit: 0, flare: 0, drop: 1.2, neck: 'crew', frontDrop: 2.4, backDrop: 0.8, neckW: 3.1, sleeve: { kind: 'long', cuff: 1.8, fullness: 1.15 }, armAngle: 17, hemBand: 2.6, folds: 0.26, zoneTop: { front: 3, back: 3.25 } },
   coach: { ease: 3.4, hemY: 29, fit: 0, flare: 0.2, drop: 1.0, neck: 'collar', frontDrop: 3.2, backDrop: 0.7, neckW: 3.2, sleeve: { kind: 'long', cuff: 1.9, fullness: 1.2 }, armAngle: 18, hemBand: 0, folds: 0.34, front: 'snaps', drawcordHem: true, zoneTop: { front: 5.5, back: 3.75 } },
   work: { ease: 3.0, hemY: 29, fit: 0, flare: 0.1, drop: 0.8, neck: 'collar', frontDrop: 3.2, backDrop: 0.7, neckW: 3.2, sleeve: { kind: 'long', cuff: 2.0, fullness: 1.1 }, armAngle: 18, hemBand: 0, folds: 0.24, front: 'buttons', pocket: 'chest-flaps', zoneTop: { front: 9.2, back: 6 } },
+  'soccer-jersey': { ease: 1.5, hemY: 28.5, fit: 0.55, flare: 0.2, drop: 0, neck: 'vneck', frontDrop: 4.3, backDrop: 0.8, neckW: 3.0, sleeve: { kind: 'short', length: 8, endR: 3.25 }, armAngle: 19, hemBand: 0, folds: 0.15, zoneTop: { front: 3, back: 2.5 } },
+  'gk-jersey': { ease: 1.9, hemY: 28.3, fit: 0.45, flare: 0.2, drop: 0.2, neck: 'crew', frontDrop: 2.3, backDrop: 0.8, neckW: 3.0, sleeve: { kind: 'long', cuff: 1.7, fullness: 0.95 }, armAngle: 17, hemBand: 0, folds: 0.18, pads: true, zoneTop: { front: 3, back: 2.5 } },
+  'base-layer': { ease: 1.1, hemY: 29, fit: 0.6, flare: 0, drop: 0.2, neck: 'crew', frontDrop: 2.3, backDrop: 0.8, neckW: 3.0, sleeve: { kind: 'long', cuff: 1.5, fullness: 0.8 }, armAngle: 17, hemBand: 0, folds: 0.05, zoneTop: { front: 4.4, back: 2 } },
+  'training-top': { ease: 1.4, hemY: 29, fit: 0.6, flare: 0.1, drop: 0, neck: 'mock', frontDrop: 1.0, backDrop: 0.4, neckW: 3.0, sleeve: { kind: 'long', cuff: 1.6, fullness: 0.9 }, armAngle: 16, hemBand: 0, folds: 0.14, front: 'halfzip', zoneTop: { front: 4.6, back: 3.5 } },
 };
 
 function buildTop(garment: GarmentId, spec: TopSpec, c: Ctx): Omit<GarmentModel, 'group' | 'materials' | 'frame'> {
@@ -183,7 +190,7 @@ function buildTop(garment: GarmentId, spec: TopSpec, c: Ctx): Omit<GarmentModel,
   const section = (y: number) => {
     const b = torsoSection(y);
     const upper = smoothstep(CHEST - 1, SHOULDER - 0.3, y);
-    const e = spec.ease * (1 - upper) + 0.45 * upper;
+    const e = spec.ease * (1 - upper) + 0.7 * upper;
     let hw = b.hw + e;
     let hd = b.hd + e * 0.72;
     let zc = b.zc;
@@ -208,7 +215,13 @@ function buildTop(garment: GarmentId, spec: TopSpec, c: Ctx): Omit<GarmentModel,
   const yN = HPS + 0.35;
   const inNeck = (p: THREE.Vector3) => {
     const zc = section(p.y).zc;
-    const drop = p.z > zc ? spec.frontDrop : spec.backDrop;
+    const front = p.z > zc;
+    const drop = front ? spec.frontDrop : spec.backDrop;
+    if (front && spec.neck === 'vneck') {
+      // straight-sided V: depth falls linearly with distance from the centre line
+      const ax = Math.abs(p.x) / spec.neckW;
+      return ax < 1 && yN - p.y < drop * (1 - ax);
+    }
     return (p.x / spec.neckW) ** 2 + ((p.y - yN) / drop) ** 2 < 1;
   };
   const inArmhole = (p: THREE.Vector3) => spec.neck === 'tank' && ((Math.abs(p.x) - 7.7) / 3.15) ** 2 + ((p.y - 55.6) / 4.9) ** 2 < 1;
@@ -256,7 +269,10 @@ function buildTop(garment: GarmentId, spec: TopSpec, c: Ctx): Omit<GarmentModel,
   const neckLoop = (phi: number, lift = 0) => {
     const x = spec.neckW * 0.985 * Math.sin(phi);
     const front = Math.cos(phi) >= 0;
-    const y = yN - (front ? spec.frontDrop : spec.backDrop) * Math.abs(Math.cos(phi)) * 0.985;
+    const y =
+      front && spec.neck === 'vneck'
+        ? yN - spec.frontDrop * (1 - Math.abs(Math.sin(phi))) * 0.985
+        : yN - (front ? spec.frontDrop : spec.backDrop) * Math.abs(Math.cos(phi)) * 0.985;
     const s = section(y);
     const e = Math.max(0, 1 - Math.pow(Math.min(1, Math.abs(x) / s.hw), 2.4));
     const z = s.zc + (front ? 1 : -1) * s.hd * Math.pow(e, 1 / 2.4);
@@ -264,8 +280,8 @@ function buildTop(garment: GarmentId, spec: TopSpec, c: Ctx): Omit<GarmentModel,
   };
 
   // ---- collars
-  if (spec.neck === 'crew' || spec.neck === 'hood' || spec.neck === 'tank') {
-    const width = spec.neck === 'tank' ? 0.45 : 0.85;
+  if (spec.neck === 'crew' || spec.neck === 'vneck' || spec.neck === 'hood' || spec.neck === 'tank' || spec.neck === 'mock') {
+    const width = spec.neck === 'tank' ? 0.45 : spec.neck === 'mock' ? 2.4 : spec.neck === 'vneck' ? 0.7 : 0.85;
     const g = gridGeometry(
       (u, v) => {
         const p = neckLoop(u * Math.PI * 2);
@@ -275,7 +291,7 @@ function buildTop(garment: GarmentId, spec: TopSpec, c: Ctx): Omit<GarmentModel,
       },
       { cols: 96, rows: 4, wrapU: true, inside: new THREE.Vector3(0, HPS - 6, 0) },
     );
-    addPart(c, g, spec.neck === 'tank' ? c.fabric : RIB, { tileScale: 0.6 });
+    addPart(c, g, spec.neck === 'tank' || spec.neck === 'mock' ? c.fabric : RIB, { tileScale: 0.6 });
   } else {
     // polo / shirt collar: stand, then fold down over the shoulders; open at centre front
     const stand = spec.neck === 'polo' ? 1.1 : 1.4;
@@ -330,6 +346,7 @@ function buildTop(garment: GarmentId, spec: TopSpec, c: Ctx): Omit<GarmentModel,
   let sleeveLimb: Limb | null = null;
   let sleeveLen = 0;
   let nUp = new THREE.Vector3();
+  const sleeves: Array<{ mesh: THREE.Mesh; limb: Limb; up: THREE.Vector3; side: number }> = [];
   if (spec.sleeve) {
     const sl = spec.sleeve;
     for (const side of [1, -1] as const) {
@@ -346,7 +363,7 @@ function buildTop(garment: GarmentId, spec: TopSpec, c: Ctx): Omit<GarmentModel,
       const axis = (t: number) => {
         const r = rAt(t);
         const c0 = a.at(Math.max(0, t)).addScaledVector(up, -Math.max(0, r - a.radius(Math.max(0, t)) - 0.35));
-        return t < 0 ? c0.add(new THREE.Vector3(side * t, 0, 0)) : c0;
+        return t < 0 ? c0.add(new THREE.Vector3(side * t, t * 0.55, 0)) : c0;
       };
       const frames = (v: number): Frame => {
         const t = t0 + v * (tEnd - t0);
@@ -362,6 +379,7 @@ function buildTop(garment: GarmentId, spec: TopSpec, c: Ctx): Omit<GarmentModel,
         return [r * 1.02, r * 0.95];
       }, { cols: 56, rows: 48, keep: (p) => !insideBody(p, 0.99) });
       const m = addPart(c, g);
+      sleeves.push({ mesh: m, limb: a, up, side });
       if (side === 1) {
         sleeveMesh = m;
         sleeveLimb = a;
@@ -422,7 +440,15 @@ function buildTop(garment: GarmentId, spec: TopSpec, c: Ctx): Omit<GarmentModel,
     const len = neckFrontY - spec.hemY;
     frontTrim(0, spec.hemY + len / 2, 0.9, len, paintZip, 8);
   }
+  if (spec.front === 'halfzip') frontTrim(0, neckFrontY - 3.6, 0.9, 7.6, paintZip, 8);
   if (spec.front === 'placket') frontTrim(0, neckFrontY - 3, 1.5, 6.4, paintPlacket);
+  if (spec.pads)
+    for (const sl of sleeves) {
+      const at = sl.limb.at(11.5);
+      // elbow: outer-back side of the arm
+      const out = sl.up.clone().multiplyScalar(0.55).add(new THREE.Vector3(0, 0, -0.85)).normalize();
+      trims.push({ anchor: anchor(sl.mesh, at.clone().addScaledVector(out, 9), out.clone().negate(), sl.limb.dir.clone().negate(), 5), w: 4.4, h: 5.2, paint: paintPad });
+    }
   if (spec.front === 'snaps' || spec.front === 'buttons') {
     const len = neckFrontY - spec.hemY;
     frontTrim(0.35, spec.hemY + len / 2, 2.2, len, paintFrontEdge, 8);
@@ -435,7 +461,7 @@ function buildTop(garment: GarmentId, spec: TopSpec, c: Ctx): Omit<GarmentModel,
     const step = (yTop - (spec.hemY + 3)) / (n - 1);
     addStuds(c, body, Array.from({ length: n }, (_, i) => new THREE.Vector3(0.35, yTop - i * step, 0)), FRONT, spec.front === 'snaps' ? 'snap' : 'button');
   }
-  if (spec.front === 'zip') {
+  if (spec.front === 'zip' || spec.front === 'halfzip') {
     const mat = new THREE.MeshStandardMaterial({ color: '#c4c4bf', roughness: 0.25, metalness: 0.9, clippingPlanes: c.clip });
     c.materials.push(mat);
     const pull = new THREE.Mesh(new THREE.BoxGeometry(0.45, 1.2, 0.12), mat);
@@ -451,7 +477,7 @@ function buildTop(garment: GarmentId, spec: TopSpec, c: Ctx): Omit<GarmentModel,
   }
 
   // inside neck label, on the back panel
-  const label = getGarment(garment).category === 'tops' || getGarment(garment).category === 'outerwear'
+  const label = garmentShape(garment) === 'top'
     ? anchor(body, new THREE.Vector3(0, HPS - spec.backDrop - 1.6, -12), BACK, undefined, 3)
     : undefined;
 
@@ -473,22 +499,29 @@ interface BottomSpec {
   cargo: boolean;
   fly: boolean;
   folds: number;
+  /** Contrast side stripe down each leg (football shorts). */
+  stripes?: boolean;
+  /** Extra crotch depth in inches: slim legs sit apart, so the pelvis panel has to reach lower. */
+  crotch?: number;
 }
 
 const BOTTOMS: Record<string, BottomSpec> = {
   joggers: { ease: 1.2, legEndY: 4.4, legR: [[-2, 4.6], [3, 4.4], [14, 3.5], [22, 3.0], [26.5, 2.75], [28.8, 2.15]], cuff: 1.95, waistband: 'rib', drawcord: true, cargo: false, fly: false, folds: 0.25 },
   shorts: { ease: 1.4, legEndY: 19.5, legR: [[-2, 4.7], [3, 4.6], [14, 4.85]], cuff: null, waistband: 'rib', drawcord: true, cargo: false, fly: false, folds: 0.22 },
+  'soccer-shorts': { ease: 1.6, legEndY: 21.5, legR: [[-2, 4.9], [3, 4.85], [12, 5.05]], cuff: null, waistband: 'rib', drawcord: true, cargo: false, fly: false, folds: 0.18, stripes: true },
+  'compression-shorts': { ease: 1.0, legEndY: 20, legR: [[-2, 4.6], [3, 4.4], [8, 3.55], [13, 3.0]], cuff: null, waistband: 'rib', drawcord: false, cargo: false, fly: false, folds: 0.04, crotch: 1.6 },
   cargo: { ease: 1.1, legEndY: 1.6, legR: [[-2, 4.5], [3, 4.3], [14, 3.7], [26, 3.45], [31.5, 3.5]], cuff: null, waistband: 'self', drawcord: false, cargo: true, fly: true, folds: 0.2 },
 };
 
 function buildBottom(garment: GarmentId, spec: BottomSpec, c: Ctx): Omit<GarmentModel, 'group' | 'materials' | 'frame'> {
   const WAIST_TOP = 41.8;
   const bandH = 1.9;
-  const yLow = BODY.CROTCH - 0.7;
+  const deep = spec.crotch ?? 0;
+  const yLow = BODY.CROTCH - 2.3 - deep;
   // bottom edge: dips to the crotch at centre front/back, rises at the sides where the legs take over
-  const yBottom = (th: number) => yLow + 5.5 * Math.pow(Math.abs(Math.sin(th)), 0.8);
+  const yBottom = (th: number) => yLow + (7 + deep) * Math.pow(Math.abs(Math.sin(th)), 0.8);
   const section = (y: number) => {
-    const b = torsoSection(Math.max(y, 30.5));
+    const b = torsoSection(Math.max(y, 30.2));
     const tuck = 1 - 0.1 * smoothstep(36, 31, y); // narrows into the legs so its side edges stay hidden
     return { hw: (b.hw + spec.ease) * tuck, hd: b.hd + spec.ease * 0.5, zc: b.zc };
   };
@@ -516,7 +549,7 @@ function buildBottom(garment: GarmentId, spec: BottomSpec, c: Ctx): Omit<Garment
     (u, v) => {
       const y = WAIST_TOP - bandH + v * bandH;
       const s = section(WAIST_TOP - bandH);
-      const k = 0.97 - 0.02 * v;
+      const k = 1 - 0.03 * v;
       const p = superPoint(u * Math.PI * 2, s.hw * k, s.hd * k, 2.3);
       return new THREE.Vector3(p.x, y, p.z + s.zc);
     },
@@ -566,6 +599,15 @@ function buildBottom(garment: GarmentId, spec: BottomSpec, c: Ctx): Omit<Garment
 
   const trims: Trim[] = [];
   if (spec.fly) trims.push({ anchor: anchor(pelvisMesh, new THREE.Vector3(-0.5, WAIST_TOP - bandH - 3.4, 12), FRONT), w: 2.4, h: 6.6, paint: paintFly });
+  if (spec.stripes) {
+    for (const side of [1, -1] as const) {
+      const l = legs[side];
+      const len = BODY.CROTCH + 2 - spec.legEndY;
+      const y = spec.legEndY + len / 2;
+      const p = l.at((l.top.y - y) / -l.dir.y);
+      trims.push({ anchor: anchor(legMeshes[side], new THREE.Vector3(p.x + side * 10, y, p.z), new THREE.Vector3(-side, 0, 0), undefined, 6), w: 1.7, h: len, paint: paintStripe });
+    }
+  }
   if (spec.cargo) {
     for (const side of [1, -1] as const) {
       const l = legs[side];
@@ -600,7 +642,7 @@ function buildBottom(garment: GarmentId, spec: BottomSpec, c: Ctx): Omit<Garment
     if (!hasView(garment, view)) continue;
     const { h } = zoneSize(garment, view);
     const l = legs[side];
-    const y = garment === 'shorts' ? spec.legEndY + 1.5 + h / 2 : BODY.CROTCH - 2 - h / 2;
+    const y = spec.legEndY > 15 ? spec.legEndY + 1.5 + h / 2 : BODY.CROTCH - 2 - h / 2;
     const p = l.at((l.top.y - y) / -l.dir.y);
     anchors[view] = anchor(legMeshes[side], new THREE.Vector3(p.x, y, 12), FRONT);
   }
@@ -742,12 +784,60 @@ function buildTote(garment: GarmentId, c: Ctx): Omit<GarmentModel, 'group' | 'ma
   return { anchors, trims: [], armAngle: 14, mannequin: false };
 }
 
+function buildSocks(garment: GarmentId, c: Ctx): Omit<GarmentModel, 'group' | 'materials' | 'frame'> {
+  const TOP_Y = 17;
+  const stripe = new THREE.Color(c.color);
+  const hsl = { h: 0, s: 0, l: 0 };
+  stripe.getHSL(hsl);
+  stripe.setHSL(hsl.h, hsl.s, hsl.l > 0.45 ? hsl.l * 0.35 : Math.min(0.92, hsl.l + 0.55));
+  const anchors: GarmentModel['anchors'] = {};
+  for (const side of [1, -1] as const) {
+    const l = leg(side);
+    const tAt = (y: number) => (l.top.y - y) / -l.dir.y;
+    const tTop = tAt(TOP_Y);
+    const tEnd = l.length + 1.9; // down into the foot shell: no gap at the ankle
+    const along = (t0: number, t1: number) => (v: number): Frame => {
+      const t = t0 + v * (t1 - t0);
+      const n = new THREE.Vector3(0, 0, 1);
+      return { c: l.at(t), n: n.clone().sub(l.dir.clone().multiplyScalar(n.dot(l.dir))).normalize(), b: new THREE.Vector3().crossVectors(l.dir, n).normalize() };
+    };
+    const legGeo = tubeGeometry(along(tTop, tEnd), (v) => l.radius(tTop + v * (tEnd - tTop)) + 0.14, { cols: 40, rows: 40 });
+    const legMesh = addPart(c, legGeo);
+    // fold-over rib cuff
+    addPart(c, tubeGeometry(along(tTop - 0.3, tTop + 2.6), (v) => l.radius(tTop + v * 2.9) + 0.34, { cols: 40, rows: 6 }), RIB, { tileScale: 0.6 });
+    // knitted-in stripes below the cuff
+    for (const [a, b] of [[3.1, 3.7], [4.0, 4.3]]) {
+      addPart(c, tubeGeometry(along(tTop + a, tTop + b), (v) => l.radius(tTop + a + v * (b - a)) + 0.17, { cols: 40, rows: 2 }), RIB, { tileScale: 0.6, color: `#${stripe.getHexString()}`, inner: false });
+    }
+    // foot: a slightly larger shell around the mannequin's foot
+    const fx = l.at(l.length).x;
+    const C = new THREE.Vector3(fx, 1.15, 2.3);
+    const Rf = new THREE.Vector3(1.6 * 1.09, 1.15 * 1.12, 4.7 * 1.04);
+    const footGeo = gridGeometry(
+      (u, v) => {
+        const th = u * Math.PI * 2;
+        const ph = -Math.PI / 2 + v * Math.PI;
+        return new THREE.Vector3(C.x + Rf.x * Math.cos(ph) * Math.sin(th), C.y + Rf.y * Math.sin(ph), C.z + Rf.z * Math.cos(ph) * Math.cos(th));
+      },
+      { cols: 48, rows: 24, wrapU: true, inside: C },
+    );
+    addPart(c, footGeo);
+    if (side === 1 && hasView(garment, 'front')) {
+      const { h } = zoneSize(garment, 'front');
+      const y = TOP_Y - 4.6 - h / 2;
+      const p = l.at(tAt(y));
+      anchors.front = anchor(legMesh, new THREE.Vector3(p.x, y, 12), FRONT, undefined, 4);
+    }
+  }
+  return { anchors, trims: [], armAngle: 14, mannequin: true };
+}
+
 /* ================================================================================================
  * Entry
  * ============================================================================================== */
 
 export function hasGarmentModel(garment: GarmentId): boolean {
-  return garment in TOPS || garment in BOTTOMS || garment === 'dadhat' || garment === 'beanie' || garment === 'tote';
+  return garment in TOPS || garment in BOTTOMS || garment === 'dadhat' || garment === 'beanie' || garment === 'tote' || garment === 'soccer-socks';
 }
 
 export function buildGarmentModel(garment: GarmentId, color: string, fabric: FabricDef, clip: THREE.Plane[]): GarmentModel | null {
@@ -764,7 +854,9 @@ export function buildGarmentModel(garment: GarmentId, color: string, fabric: Fab
           ? buildDadHat(garment, c)
           : garment === 'beanie'
             ? buildBeanie(garment, c)
-            : buildTote(garment, c);
+            : garment === 'soccer-socks'
+              ? buildSocks(garment, c)
+              : buildTote(garment, c);
   group.updateMatrixWorld(true);
   const frame = new THREE.Box3().setFromObject(group);
   // Ignore views without an anchor (e.g. future views); they simply don't show in 3D.
@@ -935,4 +1027,43 @@ function paintCargo(x: CanvasRenderingContext2D, ppi: number, ink: string, shade
   x.fillStyle = shade;
   x.fillRect(0.1 * ppi, 0.1 * ppi, W - 0.2 * ppi, 1.95 * ppi);
   stitchLine(x, ppi, ink, () => x.rect(0.24 * ppi, 0.24 * ppi, W - 0.48 * ppi, 1.65 * ppi));
+}
+
+function paintPad(x: CanvasRenderingContext2D, ppi: number, ink: string, shade: string) {
+  const W = 4.4 * ppi;
+  const H = 5.2 * ppi;
+  const r = 1.2 * ppi;
+  const path = () => {
+    x.beginPath();
+    x.roundRect(0.15 * ppi, 0.15 * ppi, W - 0.3 * ppi, H - 0.3 * ppi, r);
+  };
+  path();
+  x.fillStyle = shade.replace(/[\d.]+\)$/, (a) => `${Math.min(1, parseFloat(a) * 5)})`);
+  x.fill();
+  // quilted pad channels
+  x.save();
+  path();
+  x.clip();
+  x.strokeStyle = 'rgba(0,0,0,0.18)';
+  x.lineWidth = 0.05 * ppi;
+  for (let k = 1; k < 4; k++) {
+    x.beginPath();
+    x.moveTo(0, (H * k) / 4);
+    x.lineTo(W, (H * k) / 4);
+    x.stroke();
+  }
+  x.restore();
+  stitchLine(x, ppi, ink, () => x.roundRect(0.3 * ppi, 0.3 * ppi, W - 0.6 * ppi, H - 0.6 * ppi, r * 0.85));
+}
+
+function paintStripe(x: CanvasRenderingContext2D, ppi: number, ink: string) {
+  const light = ink.startsWith('rgba(255');
+  x.fillStyle = light ? 'rgba(245,245,245,0.9)' : 'rgba(18,18,22,0.82)';
+  x.fillRect(0.25 * ppi, 0, x.canvas.width - 0.5 * ppi, x.canvas.height);
+  stitchLine(x, ppi, light ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.3)', () => {
+    x.moveTo(0.3 * ppi, 0);
+    x.lineTo(0.3 * ppi, x.canvas.height);
+    x.moveTo(x.canvas.width - 0.3 * ppi, 0);
+    x.lineTo(x.canvas.width - 0.3 * ppi, x.canvas.height);
+  });
 }

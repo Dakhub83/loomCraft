@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { GARMENT_H, GARMENT_W, getGarment } from '../data/garments';
+import { GARMENT_H, GARMENT_W, garmentShape } from '../data/garments';
 import type { FabricDef } from '../data/fabrics';
 import type { GarmentId } from '../types';
 import { weaveNormal } from './fabricMaterials';
@@ -68,7 +68,6 @@ export function buildFlatLay(
   clip: THREE.Plane,
   fabric: FabricDef,
 ): Built {
-  const def = getGarment(garment);
   // Where only one side has fabric (a cap's brim, a hood), let the other side borrow it, mirrored, so the
   // two surfaces share one silhouette and meet cleanly at the side seams.
   const fill = (dst: HTMLCanvasElement, src: HTMLCanvasElement) => {
@@ -146,10 +145,11 @@ export function buildFlatLay(
   const sorted = halves.slice().sort((a, b) => a - b);
   const median = sorted[Math.floor(sorted.length / 2)] ?? 50;
   const maxHalf = sorted[sorted.length - 1] ?? 50;
-  const factor = garment === 'tote' ? 0.14 : def.category === 'bottoms' ? 0.75 : def.category === 'accessories' ? 0.8 : 0.5;
+  const shape = garmentShape(garment);
+  const factor = garment === 'tote' ? 0.14 : shape === 'bottom' ? 0.75 : shape === 'other' ? 0.8 : 0.5;
   const R = Math.max(4, factor * median);
   // Waistbands and bag mouths stay open: treat everything above the top edge as fabric for the distance.
-  const openTop = def.category === 'bottoms' || garment === 'tote';
+  const openTop = shape === 'bottom' || garment === 'tote' || garment === 'soccer-socks';
   const solid = new Uint8Array(mask);
   if (openTop) for (let x = 0; x < SW; x++) for (let y = 0; y < colTop[x]; y++) solid[y * SW + x] = 1;
 

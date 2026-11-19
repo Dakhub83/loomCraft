@@ -107,6 +107,41 @@ const PROFILES: Record<string, FabricProfile> = {
     construction: ['1×1 rib knit, fold-over 3″ cuff', 'Fully fashioned crown', 'Woven or embroidered patch on cuff (specify)'],
     trims: ['Woven label or patch, 2.5 × 1″'],
   },
+  'soccer-jersey': {
+    gsm: 140, composition: '100% recycled polyester birdseye interlock; side panels in 100% polyester mesh', fiber: 'polyester', care: 'Machine wash cold inside out · do not tumble dry · do not iron prints · no fabric softener',
+    construction: ['Athletic fit, set-in sleeves', 'V-neck with 1×1 rib trim', 'Ventilated mesh side panels', 'Flatlock seams throughout (no chafing)', 'Full-coverage dye sublimation recommended for kit graphics'],
+    trims: ['Heat-applied club crest (or embroidered badge)', 'Player name & number: heat-transfer vinyl or sublimated, numbers 8–10″ back / 4″ front', 'Heat-transfer care label (tagless)', 'Sleeve competition badge: silicone heat transfer'],
+  },
+  'gk-jersey': {
+    gsm: 160, composition: '100% polyester interlock; foam elbow pads', fiber: 'polyester', care: 'Machine wash cold inside out · do not tumble dry · do not iron prints · no fabric softener',
+    construction: ['Regular fit, long set-in sleeves', 'Crew neck with rib trim', 'Bonded foam pads at elbows', 'Flatlock seams; sublimated body recommended'],
+    trims: ['Heat-applied crest', 'Name & number in heat-transfer vinyl', 'Tagless heat-transfer label'],
+  },
+  'training-top': {
+    gsm: 180, composition: '92% polyester / 8% elastane brushed-back performance knit', fiber: 'polyester', care: 'Machine wash cold inside out · do not tumble dry · do not iron prints · no fabric softener',
+    construction: ['Slim fit', 'Mock-neck stand collar, 8″ quarter-zip', 'Flatlock seams', 'Optional thumbholes at cuffs'],
+    trims: ['#5 coil zip with branded puller', 'Reflective or heat-applied crest', 'Tagless heat-transfer label'],
+  },
+  'soccer-shorts': {
+    gsm: 140, composition: '100% recycled polyester interlock; contrast side panels', fiber: 'polyester', care: 'Machine wash cold inside out · do not tumble dry · do not iron prints · no fabric softener',
+    construction: ['6″ inseam, relaxed athletic fit', '1.5″ covered elastic waistband with internal drawcord', 'Contrast side panels', 'Optional inner brief liner'],
+    trims: ['Flat drawcord with silicone tips', 'Heat-applied crest and number (4″) on leg', 'Tagless heat-transfer label'],
+  },
+  'base-layer': {
+    gsm: 220, composition: '78% recycled polyester / 22% elastane, 4-way stretch warp knit', fiber: 'polyester', care: 'Machine wash cold · do not tumble dry · do not iron · no fabric softener',
+    construction: ['Compression fit (negative ease, ~30% stretch at chest)', 'Crew neck with self-fabric binding', 'Contoured side panels', 'Flatlock seams throughout, no seams on top of the shoulder', 'Long sleeves with self cuffs (thumbholes optional)'],
+    trims: ['Small heat-transfer logo (left chest) and back-neck mark', 'Tagless heat-transfer care label', 'Low-bleed, high-stretch ink only'],
+  },
+  'compression-shorts': {
+    gsm: 220, composition: '78% recycled polyester / 22% elastane, 4-way stretch warp knit', fiber: 'polyester', care: 'Machine wash cold · do not tumble dry · do not iron · no fabric softener',
+    construction: ['8″ inseam compression fit', '2″ covered elastic waistband (no drawcord)', 'Gusseted crotch', 'Flatlock seams', 'Silicone gripper tape inside the leg hems'],
+    trims: ['Heat-transfer logo on waistband or left thigh', 'Tagless heat-transfer care label', 'Colour-matched to the match shorts (competition rules)'],
+  },
+  'soccer-socks': {
+    gsm: 0, weightNote: 'Knit sock, 168-needle, cushioned foot', composition: '75% nylon / 20% polyester / 5% elastane', fiber: 'polyester', care: 'Machine wash cold · do not tumble dry · do not iron', embroideryFirst: false,
+    construction: ['Knee-high rib leg with fold-over cuff', 'Terry-cushioned sole, heel and toe', 'Arch support band', 'Knitted-in cuff stripes (yarn colours to spec)'],
+    trims: ['Knitted-in logo on calf (jacquard), or heat transfer', 'Paper band / header card'],
+  },
 };
 
 const CATEGORY_FALLBACK: Record<string, FabricProfile> = {

@@ -84,6 +84,7 @@ export const CATEGORIES: Array<{ id: GarmentCategory; label: string }> = [
   { id: 'tops', label: 'Tops' },
   { id: 'bottoms', label: 'Bottoms' },
   { id: 'outerwear', label: 'Outerwear' },
+  { id: 'soccer', label: 'Soccer' },
   { id: 'accessories', label: 'Accessories' },
   { id: 'custom', label: 'Custom' },
 ];
@@ -1039,6 +1040,353 @@ const BEANIE: GarmentDef = {
   },
 };
 
+/* ------------------------------------------------------------------------- SOCCER */
+
+const JERSEY_SLEEVES: Panel[] = [
+  { d: 'M112,64 L36,178 L80,214 L110,192 Q100,130 112,64 Z' },
+  { d: 'M388,64 L464,178 L420,214 L390,192 Q400,130 388,64 Z' },
+];
+const JERSEY_BELOW = 'L388,64 Q400,130 390,192 L394,522 Q250,534 106,522 L110,192 Q100,130 112,64 Z';
+/** Contrast side panels (ventilated mesh on real kits). */
+const JERSEY_SIDES: Panel[] = [
+  { d: 'M110,192 L134,200 Q142,360 136,524 L106,522 Z', tone: -0.07 },
+  { d: 'M390,192 L366,200 Q358,360 364,524 L394,522 Z', tone: -0.07 },
+];
+const JERSEY_COMMON = {
+  ribs: [{ d: 'M40,182 L82,215', w: 7 }, { d: 'M460,182 L418,215', w: 7 }],
+  stitches: ['M118,68 Q108,130 117,192', 'M382,68 Q392,130 383,192', 'M134,206 Q142,360 137,516', 'M366,206 Q358,360 363,516', 'M108,508 Q250,520 392,508'],
+  folds: ['M170,250 Q180,330 168,430', 'M330,256 Q320,340 334,436', 'M410,96 Q436,140 444,182', 'M90,96 Q64,140 56,182'],
+};
+
+const SOCCER_JERSEY: GarmentDef = {
+  id: 'soccer-jersey',
+  name: 'Soccer Jersey',
+  short: 'Jersey',
+  category: 'soccer',
+  group: 'Match kit',
+  spec: '140 GSM performance polyester · athletic fit · V-neck · mesh side panels',
+  views: [
+    {
+      id: 'front',
+      label: 'Front',
+      art: {
+        behind: [{ d: 'M200,40 C224,50 276,50 300,40 L250,112 Z', tone: -0.38, flat: true }],
+        panels: [...JERSEY_SLEEVES, { d: `M200,40 L250,108 L300,40 ${JERSEY_BELOW}` }, ...JERSEY_SIDES],
+        ribs: [{ d: 'M202,42 L250,104 L298,42', w: 9 }, ...JERSEY_COMMON.ribs],
+        stitches: ['M196,50 L250,120 L304,50', ...JERSEY_COMMON.stitches],
+        folds: JERSEY_COMMON.folds,
+      },
+      zone: zone(140, 120, 220, 260, 11, 13, 'Crest on left chest, sponsor across centre chest, ~3 in below HPS'),
+    },
+    {
+      id: 'back',
+      label: 'Back',
+      art: {
+        panels: [...JERSEY_SLEEVES, { d: `M200,40 C222,52 278,52 300,40 ${JERSEY_BELOW}` }, ...JERSEY_SIDES],
+        ribs: [{ d: 'M201,42 C223,55 277,55 299,42', w: 8 }, ...JERSEY_COMMON.ribs],
+        stitches: ['M197,50 C220,64 280,64 303,50', ...JERSEY_COMMON.stitches],
+        folds: JERSEY_COMMON.folds,
+      },
+      zone: zone(140, 92, 220, 300, 11, 15, 'Player name ~2.5 in below collar, number (8-10 in) below'),
+    },
+    { ...SHORT_SLEEVE_VIEW, zone: zone(160, 190, 180, 180, 4.5, 4.5, 'League / competition badge, centred on sleeve') },
+  ],
+  sizeChart: {
+    points: [
+      ['A', 'Chest width', '1" below armhole, side to side', 21, 1, 0.5],
+      ['B', 'Body length', 'From HPS to hem', 28.5, 0.75, 0.5],
+      ['C', 'Shoulder width', 'Seam to seam', 17.5, 0.625, 0.375],
+      ['D', 'Sleeve length', 'Shoulder seam to sleeve hem', 8, 0.25, 0.25],
+      ['E', 'Sleeve opening', 'Straight across sleeve hem', 6.75, 0.25, 0.25],
+      ['F', 'Bottom width', 'Straight across hem', 20.5, 1, 0.5],
+      ['G', 'Neck width', 'Seam to seam at HPS', 7, 0.25, 0.25],
+      ['H', 'V-neck drop', 'HPS line to bottom of V', 4.25, 0.125, 0.125],
+    ],
+  },
+};
+
+const GK_PADS: Panel[] = [
+  { d: 'M46,266 Q70,258 96,266 L94,318 Q70,326 44,318 Z', tone: -0.1 },
+  { d: 'M454,266 Q430,258 404,266 L406,318 Q430,326 456,318 Z', tone: -0.1 },
+];
+const GK_PAD_STITCH = ['M50,270 Q70,263 92,270 L90,314 Q70,321 48,314 Z', 'M450,270 Q430,263 408,270 L410,314 Q430,321 452,314 Z'];
+
+const GK_JERSEY: GarmentDef = {
+  id: 'gk-jersey',
+  name: 'Goalkeeper Jersey',
+  short: 'GK Jersey',
+  category: 'soccer',
+  group: 'Match kit',
+  spec: '160 GSM performance polyester · long sleeve · padded elbows · crew neck',
+  views: [
+    {
+      id: 'front',
+      label: 'Front',
+      art: {
+        behind: [{ d: 'M192,44 C220,56 280,56 308,44 C286,88 214,88 192,44 Z', tone: -0.38, flat: true }],
+        panels: [...LS_SLEEVES, { d: `M192,44 C214,88 286,88 308,44 ${LS_BELOW}` }, ...GK_PADS],
+        ribs: [{ d: 'M194,45.5 C220,56 280,56 306,45.5', w: 5, tone: -0.2 }, { d: 'M193,47 C214,92 286,92 307,47', w: 10 }, ...LS_COMMON.ribs],
+        stitches: ['M190,53 C212,102 288,102 310,53', ...LS_COMMON.stitches, ...GK_PAD_STITCH],
+        folds: LS_COMMON.folds,
+      },
+      zone: zone(140, 120, 220, 260, 11, 13, 'Crest on left chest, sponsor across centre chest'),
+    },
+    {
+      id: 'back',
+      label: 'Back',
+      art: {
+        panels: [...LS_SLEEVES, { d: `M192,44 C218,56 282,56 308,44 ${LS_BELOW}` }, ...GK_PADS],
+        ribs: [{ d: 'M193,47 C219,60 281,60 307,47', w: 8 }, ...LS_COMMON.ribs],
+        stitches: ['M190,54 C217,69 283,69 310,54', ...LS_COMMON.stitches, ...GK_PAD_STITCH],
+        folds: LS_COMMON.folds,
+      },
+      zone: zone(140, 92, 220, 300, 11, 15, 'Player name ~2.5 in below collar, number (8-10 in) below'),
+    },
+    LONG_SLEEVE_VIEW,
+  ],
+  sizeChart: {
+    points: [
+      ['A', 'Chest width', '1" below armhole, side to side', 21.5, 1, 0.5],
+      ['B', 'Body length', 'From HPS to hem', 29, 0.75, 0.5],
+      ['C', 'Shoulder width', 'Seam to seam', 18, 0.625, 0.375],
+      ['D', 'Sleeve length', 'Shoulder seam to cuff edge', 25, 0.5, 0.375],
+      ['E', 'Elbow pad', 'Pad width', 5, 0, 0.25],
+      ['F', 'Cuff opening', 'Straight across cuff', 3.75, 0.125, 0.125],
+      ['G', 'Neck width', 'Seam to seam at HPS', 7, 0.25, 0.25],
+    ],
+  },
+};
+
+const TRAINING_TOP: GarmentDef = {
+  id: 'training-top',
+  name: 'Training Quarter-Zip',
+  short: 'Training Top',
+  category: 'soccer',
+  group: 'Training',
+  spec: '180 GSM performance polyester · slim fit · quarter-zip mock neck',
+  views: [
+    {
+      id: 'front',
+      label: 'Front',
+      art: {
+        panels: [...LS_SLEEVES, { d: `M194,48 Q250,60 306,48 ${LS_BELOW}` }, { d: 'M194,24 L306,24 L306,50 Q250,62 194,50 Z', tone: -0.03 }],
+        ribs: LS_COMMON.ribs,
+        seams: ['M250,24 L250,168'],
+        stitches: ['M244,27 L244,168', 'M256,27 L256,168', 'M196,30 L304,30', ...LS_COMMON.stitches],
+        folds: LS_COMMON.folds,
+        buttons: [[250, 40, 4.5]],
+      },
+      zone: zone(270, 116, 80, 80, 4, 4, "Club crest on wearer's left chest"),
+    },
+    {
+      id: 'back',
+      label: 'Back',
+      art: {
+        panels: [...LS_SLEEVES, { d: `M194,48 Q250,58 306,48 ${LS_BELOW}` }, { d: 'M194,24 L306,24 L306,50 Q250,58 194,50 Z', tone: -0.03 }],
+        ribs: LS_COMMON.ribs,
+        stitches: ['M196,30 L304,30', ...LS_COMMON.stitches],
+        folds: LS_COMMON.folds,
+      },
+      zone: zone(140, 100, 220, 260, 11, 13, 'Centre back, ~3 in below collar (initials / squad number)'),
+    },
+    LONG_SLEEVE_VIEW,
+  ],
+  sizeChart: {
+    points: [
+      ['A', 'Chest width', '1" below armhole, side to side', 21, 1, 0.5],
+      ['B', 'Body length', 'From HPS to hem', 28, 0.75, 0.5],
+      ['C', 'Shoulder width', 'Seam to seam', 17.5, 0.625, 0.375],
+      ['D', 'Sleeve length', 'Shoulder seam to cuff edge', 25.5, 0.5, 0.375],
+      ['E', 'Collar height', 'Stand collar, at centre back', 2.5, 0, 0.125],
+      ['F', 'Zip length', 'Top of collar to zip end', 8, 0, 0.25],
+    ],
+  },
+};
+
+const SOCCER_SHORTS_BODY = 'M140,70 L360,70 Q372,140 382,240 L390,362 L268,370 L256,274 Q250,266 244,274 L232,370 L110,362 L118,240 Q128,140 140,70 Z';
+const SOCCER_SHORTS_BACK: VectorArt = {
+  panels: [
+    { d: SOCCER_SHORTS_BODY },
+    { d: 'M140,70 L156,70 Q146,200 134,363 L110,362 L118,240 Q128,140 140,70 Z', tone: -0.12 },
+    { d: 'M360,70 L344,70 Q354,200 366,363 L390,362 L382,240 Q372,140 360,70 Z', tone: -0.12 },
+  ],
+  ribs: [{ d: 'M140,86 L360,86', w: 32 }],
+  seams: ['M250,102 L250,268'],
+  stitches: ['M113,348 L232,356', 'M268,356 L387,348', 'M141,104 L359,104'],
+  folds: ['M168,300 Q178,334 168,358', 'M332,300 Q322,334 332,358', 'M206,288 Q218,316 226,336'],
+};
+const SOCCER_SHORTS_FRONT: VectorArt = {
+  ...SOCCER_SHORTS_BACK,
+  cords: [{ d: 'M242,94 Q236,124 240,150', w: 3.5 }, { d: 'M258,94 Q264,124 260,150', w: 3.5 }],
+  eyelets: [[242, 90], [258, 90]],
+};
+
+const SOCCER_SHORTS: GarmentDef = {
+  id: 'soccer-shorts',
+  name: 'Soccer Shorts',
+  short: 'Shorts',
+  category: 'soccer',
+  group: 'Match kit',
+  spec: '140 GSM performance polyester · 6" inseam · elastic waist with drawcord · contrast side panels',
+  views: [
+    { id: 'left-leg', label: 'Left Leg', art: SOCCER_SHORTS_FRONT, zone: zone(282, 254, 76, 76, 3.8, 3.8, "Player number, wearer's left leg front") },
+    { id: 'right-leg', label: 'Right Leg', art: SOCCER_SHORTS_FRONT, zone: zone(142, 254, 76, 76, 3.8, 3.8, "Club crest, wearer's right leg front") },
+    { id: 'back', label: 'Back', art: SOCCER_SHORTS_BACK, zone: zone(150, 112, 200, 60, 10, 3, 'Back, below waistband') },
+  ],
+  sizeChart: {
+    points: [
+      ['A', 'Waist (relaxed)', 'Across top of waistband, relaxed', 14, 1, 0.5],
+      ['B', 'Hip', '6" below waist seam, across', 23, 1, 0.5],
+      ['C', 'Front rise', 'Waist seam to crotch seam, front', 11.5, 0.25, 0.25],
+      ['D', 'Back rise', 'Waist seam to crotch seam, back', 15, 0.25, 0.25],
+      ['E', 'Inseam', 'Crotch seam to hem', 6, 0, 0.25],
+      ['F', 'Leg opening', 'Across hem', 13.5, 0.5, 0.25],
+    ],
+  },
+};
+
+const SOCKS: GarmentDef = {
+  id: 'soccer-socks',
+  name: 'Soccer Socks',
+  short: 'Socks',
+  category: 'soccer',
+  group: 'Match kit',
+  spec: 'Nylon / polyester / elastane rib · knee-high · cushioned foot · cuff stripes',
+  views: [
+    {
+      id: 'front',
+      label: 'Calf',
+      art: {
+        panels: [
+          { d: 'M184,36 L316,36 L314,350 Q314,402 352,424 L422,446 Q462,460 458,496 Q454,528 414,528 L240,528 Q186,528 186,470 Z' },
+          { d: 'M185,96 L315,96 L315,110 L185,110 Z', tone: -0.25 },
+          { d: 'M185,118 L315,118 L315,126 L185,126 Z', tone: -0.25 },
+          { d: 'M412,446 Q462,460 458,496 Q454,528 414,528 Q432,488 412,446 Z', tone: -0.06 },
+          { d: 'M186,440 Q186,528 240,528 L262,528 Q206,510 204,440 Z', tone: -0.06 },
+        ],
+        ribs: [{ d: 'M184,60 L316,60', w: 44 }, { d: 'M190,140 L310,140', w: 300, clip: true }],
+        stitches: ['M420,452 Q438,490 418,524'],
+        folds: ['M220,200 Q226,280 218,340', 'M280,180 Q276,260 284,330', 'M300,380 Q320,400 340,410'],
+      },
+      zone: zone(198, 140, 104, 160, 3.2, 4.9, 'Calf, below the cuff stripes'),
+    },
+  ],
+  sizeChart: {
+    sizes: ['S', 'M', 'L', 'XL'],
+    base: 'M',
+    points: [
+      ['A', 'Foot length', 'Heel to toe, relaxed', 10, 0.5, 0.25],
+      ['B', 'Leg length', 'Heel to top of cuff', 15, 0.5, 0.25],
+      ['C', 'Cuff height', 'Fold to edge', 2.5, 0, 0.125],
+      ['D', 'Calf width', 'Relaxed, across calf', 3.75, 0.25, 0.25],
+    ],
+  },
+};
+
+/* Underlayer: compression base layers worn under the kit. */
+const BL_SLEEVES: Panel[] = [
+  { d: 'M124,68 L86,106 Q62,280 60,462 L96,464 Q106,320 128,200 Q110,140 124,68 Z' },
+  { d: 'M376,68 L414,106 Q438,280 440,462 L404,464 Q394,320 372,200 Q390,140 376,68 Z' },
+];
+const BL_BELOW = 'L376,68 Q390,140 372,200 Q358,330 366,524 Q250,534 134,524 Q142,330 128,200 Q110,140 124,68 Z';
+/** Contoured side panels joined with flatlock seams. */
+const BL_SIDES: Panel[] = [
+  { d: 'M128,200 L146,206 Q156,330 150,525 L134,524 Q142,330 128,200 Z', tone: -0.06 },
+  { d: 'M372,200 L354,206 Q344,330 350,525 L366,524 Q358,330 372,200 Z', tone: -0.06 },
+];
+const BL_COMMON = {
+  ribs: [{ d: 'M96,474 L60,472', w: 22 }, { d: 'M404,474 L440,472', w: 22 }],
+  stitches: [
+    'M127,74 Q114,140 131,200', 'M373,74 Q386,140 369,200',
+    'M146,208 Q156,330 150,518', 'M354,208 Q344,330 350,518',
+    'M136,514 Q250,524 364,514',
+    'M100,220 Q86,330 92,456', 'M400,220 Q414,330 408,456',
+  ],
+  folds: ['M72,170 Q64,240 70,300', 'M428,170 Q436,240 430,300'],
+};
+
+const BASE_LAYER: GarmentDef = {
+  id: 'base-layer',
+  name: 'Base Layer Top',
+  short: 'Base Layer',
+  category: 'soccer',
+  group: 'Underlayer',
+  spec: '220 GSM polyester / elastane compression knit · long sleeve · crew neck · flatlock seams',
+  views: [
+    {
+      id: 'front',
+      label: 'Front',
+      art: {
+        behind: [{ d: 'M200,44 C222,54 278,54 300,44 C282,82 218,82 200,44 Z', tone: -0.38, flat: true }],
+        panels: [...BL_SLEEVES, { d: `M200,44 C218,82 282,82 300,44 ${BL_BELOW}` }, ...BL_SIDES],
+        ribs: [{ d: 'M202,46 C220,80 280,80 298,46', w: 7 }, ...BL_COMMON.ribs],
+        stitches: ['M198,52 C218,92 282,92 302,52', ...BL_COMMON.stitches],
+        folds: BL_COMMON.folds,
+      },
+      zone: zone(268, 112, 70, 70, 3.5, 3.5, "Small logo on wearer's left chest"),
+    },
+    {
+      id: 'back',
+      label: 'Back',
+      art: {
+        panels: [...BL_SLEEVES, { d: `M200,44 C222,54 278,54 300,44 ${BL_BELOW}` }, ...BL_SIDES],
+        ribs: [{ d: 'M201,46 C222,57 278,57 299,46', w: 7 }, ...BL_COMMON.ribs],
+        stitches: ['M198,53 C221,66 279,66 302,53', ...BL_COMMON.stitches],
+        folds: BL_COMMON.folds,
+      },
+      zone: zone(190, 76, 120, 60, 6, 3, 'Upper back, ~2 in below collar (brand mark or initials)'),
+    },
+    { ...LONG_SLEEVE_VIEW, zone: zone(215, 110, 70, 240, 3.5, 12, 'Left sleeve, centred, ~2 in below shoulder seam') },
+  ],
+  sizeChart: {
+    points: [
+      ['A', 'Chest width', '1" below armhole, relaxed (stretches ~30%)', 17.5, 1, 0.5],
+      ['B', 'Body length', 'From HPS to hem', 27.5, 0.75, 0.5],
+      ['C', 'Shoulder width', 'Seam to seam', 16, 0.5, 0.375],
+      ['D', 'Sleeve length', 'Shoulder seam to cuff edge', 25, 0.5, 0.375],
+      ['E', 'Cuff opening', 'Straight across cuff, relaxed', 3, 0.125, 0.125],
+      ['F', 'Neck width', 'Seam to seam at HPS', 6.75, 0.25, 0.25],
+    ],
+  },
+};
+
+const COMP_SHORTS_BODY = 'M150,70 L350,70 Q360,150 370,250 L378,400 L264,408 L256,290 Q250,282 244,290 L236,408 L122,400 L130,250 Q140,150 150,70 Z';
+const COMP_SHORTS_BACK: VectorArt = {
+  panels: [
+    { d: COMP_SHORTS_BODY },
+    { d: 'M150,70 L166,70 Q154,240 152,403 L122,400 L130,250 Q140,150 150,70 Z', tone: -0.06 },
+    { d: 'M350,70 L334,70 Q346,240 348,403 L378,400 L370,250 Q360,150 350,70 Z', tone: -0.06 },
+  ],
+  ribs: [{ d: 'M150,86 L350,86', w: 32 }, { d: 'M124,394 L235,402', w: 11, tone: -0.12 }, { d: 'M265,402 L376,394', w: 11, tone: -0.12 }],
+  seams: ['M250,102 L250,284'],
+  stitches: ['M166,104 Q154,240 152,386', 'M334,104 Q346,240 348,386', 'M151,104 L349,104', 'M246,104 L246,282', 'M254,104 L254,282'],
+  folds: ['M200,330 Q212,352 222,370', 'M300,330 Q288,352 278,370'],
+};
+
+const COMP_SHORTS: GarmentDef = {
+  id: 'compression-shorts',
+  name: 'Compression Shorts',
+  short: 'Comp. Shorts',
+  category: 'soccer',
+  group: 'Underlayer',
+  spec: '220 GSM polyester / elastane compression knit · 8" inseam · silicone leg grippers',
+  views: [
+    { id: 'front', label: 'Front', art: COMP_SHORTS_BACK, zone: zone(200, 110, 100, 50, 5, 2.5, 'Centre front, just below the waistband') },
+    { id: 'left-leg', label: 'Left Leg', art: COMP_SHORTS_BACK, zone: zone(282, 300, 64, 64, 3.2, 3.2, "Wearer's left thigh, ~2 in above the hem") },
+    { id: 'back', label: 'Back', art: COMP_SHORTS_BACK, zone: zone(175, 112, 150, 50, 7.5, 2.5, 'Back, below waistband') },
+  ],
+  sizeChart: {
+    points: [
+      ['A', 'Waist (relaxed)', 'Across top of waistband, relaxed', 12.5, 1, 0.5],
+      ['B', 'Hip', '6" below waist seam, relaxed', 17, 1, 0.5],
+      ['C', 'Front rise', 'Waist seam to crotch seam, front', 10, 0.25, 0.25],
+      ['D', 'Back rise', 'Waist seam to crotch seam, back', 13.5, 0.25, 0.25],
+      ['E', 'Inseam', 'Crotch seam to hem', 8, 0, 0.25],
+      ['F', 'Leg opening', 'Across hem, relaxed', 8.5, 0.375, 0.25],
+    ],
+  },
+};
+
 /* ------------------------------------------------------------------------- registry */
 
 export const BUILT_IN_GARMENTS: GarmentDef[] = [
@@ -1046,6 +1394,7 @@ export const BUILT_IN_GARMENTS: GarmentDef[] = [
   HOODIE, ZIPHOODIE, CREWNECK,
   JOGGERS, SHORTS, CARGO,
   COACH, WORK,
+  SOCCER_JERSEY, GK_JERSEY, TRAINING_TOP, SOCCER_SHORTS, SOCKS, BASE_LAYER, COMP_SHORTS,
   TOTE, DADHAT, BEANIE,
 ];
 
@@ -1092,3 +1441,13 @@ export const getView = (id: GarmentId, view: ViewId): GarmentView => {
 export const viewLabel = (id: GarmentId, view: ViewId) => getView(id, view).label;
 export const getZone = (id: GarmentId, view: ViewId): PrintZone => getView(id, view).zone;
 export const zonePpi = (z: PrintZone): number => z.w / z.widthIn;
+
+/** Body shape, for code that needs to know whether a garment is worn on the torso or the legs. */
+export type GarmentShape = 'top' | 'bottom' | 'other';
+const SHAPE_OVERRIDE: Record<string, GarmentShape> = { 'soccer-shorts': 'bottom', 'compression-shorts': 'bottom', 'soccer-socks': 'other' };
+export function garmentShape(id: GarmentId): GarmentShape {
+  const o = SHAPE_OVERRIDE[id];
+  if (o) return o;
+  const c = getGarment(id).category;
+  return c === 'tops' || c === 'outerwear' || c === 'soccer' ? 'top' : c === 'bottoms' ? 'bottom' : 'other';
+}

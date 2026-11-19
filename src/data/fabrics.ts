@@ -7,7 +7,7 @@ import { getGarment } from './garments';
  * a fabric is chosen explicitly for a garment.
  * ============================================================================================== */
 
-export type WeaveKind = 'jersey' | 'pique' | 'fleece' | 'terry' | 'rib' | 'nylon' | 'twill' | 'denim' | 'canvas' | 'mesh';
+export type WeaveKind = 'jersey' | 'pique' | 'fleece' | 'terry' | 'rib' | 'nylon' | 'twill' | 'denim' | 'canvas' | 'mesh' | 'performance';
 
 export interface FabricLook {
   weave: WeaveKind;
@@ -158,6 +158,28 @@ export const FABRICS: FabricDef[] = [
     look: { weave: 'canvas', tileIn: 0.3, roughness: 0.9, sheen: 0.12, sheenRoughness: 0.7, normalStrength: 0.8, mottle: 0.07 },
   },
   {
+    id: 'performance',
+    name: 'Performance polyester',
+    short: 'Performance',
+    gsm: 140,
+    composition: '100% recycled polyester birdseye interlock, moisture-wicking finish',
+    fiber: 'polyester',
+    care: 'Machine wash cold · do not tumble dry · do not iron prints · no fabric softener',
+    description: 'Light, quick-dry sports knit with a fine birdseye face: kits and training wear.',
+    look: { weave: 'performance', tileIn: 0.3, roughness: 0.62, sheen: 0.3, sheenRoughness: 0.35, normalStrength: 0.45, mottle: 0.01, clearcoat: 0.06 },
+  },
+  {
+    id: 'compression',
+    name: 'Compression knit',
+    short: 'Compression',
+    gsm: 220,
+    composition: '78% recycled polyester / 22% elastane, 4-way stretch warp knit',
+    fiber: 'polyester',
+    care: 'Machine wash cold · do not tumble dry · do not iron · no fabric softener',
+    description: 'Smooth, high-stretch knit with a slight sheen: base layers and compression shorts.',
+    look: { weave: 'jersey', tileIn: 0.22, roughness: 0.66, sheen: 0.4, sheenRoughness: 0.35, normalStrength: 0.2, mottle: 0.005 },
+  },
+  {
     id: 'mesh',
     name: 'Athletic mesh',
     short: 'Mesh',
@@ -190,14 +212,44 @@ const GARMENT_DEFAULT: Record<string, string> = {
   tote: 'canvas',
   dadhat: 'twill',
   beanie: 'rib',
+  'soccer-jersey': 'performance',
+  'gk-jersey': 'performance',
+  'training-top': 'performance',
+  'soccer-shorts': 'performance',
+  'soccer-socks': 'rib',
+  'base-layer': 'compression',
+  'compression-shorts': 'compression',
 };
+
+/** Fabrics that suit a garment, its default first. The picker shows these before the rest. */
+const SUGGEST: Record<string, string[]> = {
+  tops: ['jersey', 'heavy-jersey', 'pique', 'performance', 'terry', 'fleece'],
+  bottoms: ['fleece', 'terry', 'twill', 'denim', 'performance', 'mesh'],
+  outerwear: ['nylon', 'canvas', 'denim', 'fleece', 'twill'],
+  soccer: ['performance', 'mesh', 'pique', 'jersey', 'compression'],
+  accessories: ['canvas', 'twill', 'denim', 'rib', 'nylon'],
+};
+const SUGGEST_BY_ID: Record<string, string[]> = {
+  'soccer-socks': ['rib', 'performance'],
+  'base-layer': ['compression', 'performance', 'jersey'],
+  'compression-shorts': ['compression', 'performance'],
+  hoodie: ['fleece', 'terry', 'heavy-jersey'],
+  ziphoodie: ['fleece', 'terry', 'heavy-jersey'],
+  crewneck: ['terry', 'fleece', 'heavy-jersey'],
+  beanie: ['rib'],
+};
+
+export function suggestedFabrics(garment: GarmentId): FabricDef[] {
+  const ids = [defaultFabricFor(garment).id, ...(SUGGEST_BY_ID[garment] ?? SUGGEST[getGarment(garment).category] ?? [])];
+  return [...new Set(ids)].map((id) => BY_ID.get(id)).filter((f): f is FabricDef => !!f);
+}
 
 /** The fabric a garment is made of by default (before the user picks one). */
 export function defaultFabricFor(garment: GarmentId): FabricDef {
   const id = GARMENT_DEFAULT[garment];
   if (id) return BY_ID.get(id)!;
   const cat = getGarment(garment).category;
-  return BY_ID.get(cat === 'outerwear' ? 'nylon' : cat === 'accessories' ? 'canvas' : 'jersey')!;
+  return BY_ID.get(cat === 'outerwear' ? 'nylon' : cat === 'accessories' ? 'canvas' : cat === 'soccer' ? 'performance' : 'jersey')!;
 }
 
 /** The fabric in use: an explicit choice for this garment, else its default. */

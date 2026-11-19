@@ -26,12 +26,22 @@ The key is read by a small proxy inside the Vite dev/preview server (`server/cla
   - Bottoms: Joggers, Shorts, Cargo Pants
   - Outerwear: Coach Jacket, Work Jacket
   - Accessories: Tote, Dad Hat, Beanie
+  - Soccer: Soccer Jersey (V-neck, mesh side panels), Goalkeeper Jersey (padded elbows), Training Quarter-Zip, Soccer Shorts, Soccer Socks, plus an Underlayer group: a compression Base Layer Top and Compression Shorts (sliding shorts) in a new Compression knit fabric. Each has print zones for crests, sponsors, back name and number, sleeve badges and shorts numbers, plus a kit-specific manufacturing profile.
 
   Each garment has its own views (for example Front / Back / Left Leg / Right Leg, or Crown) and print areas sized in inches, and the UI and tech pack follow them.
 - **Photoshop import**: open a `.psd` from **Graphics → Import Photoshop project** (or drop it on the upload box).
   - Pick layers, and choose which view each top-level group goes to. Groups named Front, Back, Sleeve and so on are matched automatically, and hidden and background or mockup layers start unchecked.
   - Choose the placement: the canvas is the print area, fit the artwork to the print area, or actual size from the file's ppi.
   - Text layers stay editable when their font is on Google Fonts. Otherwise, or with **Merge into one image per view**, they come in as pixels.
+- **Fabric**: the toolbar's Fabric section picks the fabric for the current garment:
+  - Recommended swatches come first, rendered in your garment color, with more fabrics below.
+  - The weave shows on the design view, in exported mockups and in the 360° view.
+  - The choice is saved with the design, printed in the PDF tech pack and used by the manufacturing spec.
+- **Mannequin Studio**: a sized, studio-lit 3D mannequin (the "Mannequin" button above the canvas):
+  - Full-body mannequin or torso dress form; Athletic Male, Female and Neutral Unisex presets; live chest, waist, hips, shoulder-width and height sliders that morph the body smoothly.
+  - Four surfaces (matte clay, satin fiberglass, graphite carbon, tailor's linen) on a brushed-steel stand with three-point lighting and soft shadows.
+  - Test-fit a fitted tee or hoodie in any colour and place an uploaded graphic on the front or back at real size.
+  - Camera snaps (Full, Front, Back, 3/4, Collar & Chest), PNG snapshots, and loading your own .glb / .gltf mannequins (Draco and Meshopt supported).
 - **360° preview** (the **360° View** button on the stage):
   - **3D model:** every built-in garment is a 3D model worn on a mannequin, with collars, cuffs, rib bands, hoods, pockets, zippers, snaps, buttons and drawcords. Your artwork from every view (front, back, sleeve, legs) is projected onto it at its true print size.
   - **Flat-lay:** a mode that is exact to the 2D drawing. It's the only mode for custom photo blanks.

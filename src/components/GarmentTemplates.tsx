@@ -2,6 +2,8 @@ import { memo } from 'react';
 import type { GarmentId, TintMode, ViewId } from '../types';
 import { isDark, tone } from '../utils/color';
 import { GARMENT_H, GARMENT_W, getGarment, getView, type Panel, type VectorArt } from '../data/garments';
+import { getFabric } from '../data/fabrics';
+import { weaveHighlight, weaveOverlay } from '../utils/weave';
 
 // Re-exported so existing imports keep working; the data lives in src/data/garments.ts.
 export { GARMENT_H, GARMENT_W, getGarment, getZone, zonePpi } from '../data/garments';
@@ -18,6 +20,8 @@ interface GarmentSVGProps {
   showShadow?: boolean;
   /** Thumbnail mode: skips the turbulence grain and blurred folds (much cheaper to paint). */
   lite?: boolean;
+  /** Fabric id: lays that weave over the drawing at true scale (~20 studio px per inch). */
+  fabric?: string;
 }
 
 /**
@@ -31,7 +35,7 @@ export const GarmentSVG = memo(function GarmentSVG(props: GarmentSVGProps) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox={`0 0 ${GARMENT_W} ${GARMENT_H}`} width={width} height={height} className={className}>
       {v.art ? (
-        <VectorGarment art={v.art} color={props.color} uid={uid} showShadow={props.showShadow ?? true} lite={!!props.lite} />
+        <VectorGarment art={v.art} color={props.color} uid={uid} showShadow={props.showShadow ?? true} lite={!!props.lite} fabric={props.fabric} />
       ) : v.image ? (
         <PhotoGarment image={v.image} color={props.color} uid={uid} tint={def.custom?.tint ?? 'multiply'} />
       ) : null}
@@ -71,8 +75,10 @@ function PhotoGarment({ image, color, uid, tint }: { image: string; color: strin
   );
 }
 
-function VectorGarment({ art, color, uid, showShadow, lite }: { art: VectorArt; color: string; uid: string; showShadow: boolean; lite: boolean }) {
+function VectorGarment({ art, color, uid, showShadow, lite, fabric }: { art: VectorArt; color: string; uid: string; showShadow: boolean; lite: boolean; fabric?: string }) {
   const dark = isDark(color);
+  const weave = !lite ? getFabric(fabric) : undefined;
+  const tile = weave ? weave.look.tileIn * 20 : 0;
   const outline = dark ? tone(color, 0.26) : tone(color, -0.45);
   const stitch = dark ? tone(color, 0.42) : tone(color, -0.34);
   const ribLine = dark ? tone(color, 0.16) : tone(color, -0.22);
@@ -122,6 +128,16 @@ function VectorGarment({ art, color, uid, showShadow, lite }: { art: VectorArt; 
             <feGaussianBlur stdDeviation={12} />
           </filter>
         )}
+        {weave && (
+          <pattern id={id('weave')} patternUnits="userSpaceOnUse" width={tile} height={tile}>
+            <image href={weaveOverlay(weave)} width={tile} height={tile} preserveAspectRatio="none" />
+          </pattern>
+        )}
+        {weave && dark && (
+          <pattern id={id('weave-hi')} patternUnits="userSpaceOnUse" width={tile} height={tile}>
+            <image href={weaveHighlight(weave)} width={tile} height={tile} preserveAspectRatio="none" />
+          </pattern>
+        )}
         <clipPath id={id('clip')}>
           {silhouette.map((p, i) => (
             <path key={i} d={p.d} />
@@ -144,6 +160,10 @@ function VectorGarment({ art, color, uid, showShadow, lite }: { art: VectorArt; 
       {!lite && (
         <rect width={GARMENT_W} height={GARMENT_H} fill="#000" filter={url('noise')} clipPath={url('clip')} opacity={dark ? 0.55 : 0.3} />
       )}
+
+      {/* the chosen fabric's weave, at real scale */}
+      {weave && <rect width={GARMENT_W} height={GARMENT_H} fill={url('weave')} clipPath={url('clip')} opacity={dark ? 0.55 : 0.4} />}
+      {weave && dark && <rect width={GARMENT_W} height={GARMENT_H} fill={url('weave-hi')} clipPath={url('clip')} opacity={0.09} />}
 
       {/* soft fabric folds */}
       <g clipPath={url('clip')} filter={lite ? undefined : url('blur')} fill="none" strokeLinecap="round">

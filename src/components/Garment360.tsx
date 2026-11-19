@@ -228,7 +228,7 @@ export default function Garment360({ name, garment, color, designs, effects, fab
           }
         }
         if (!built) {
-          const tex = await tools.buildTurntableTextures({ garment, color, designs, effects }, 2);
+          const tex = await tools.buildTurntableTextures({ garment, color, designs, effects, fabrics: { [garment]: fabric.id } }, 2);
           if (cancelled) return;
           built = buildFlatLay(garment, tex, st.clip, fabric);
         }
