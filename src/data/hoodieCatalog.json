@@ -1,0 +1,778 @@
+{
+  "catalog": "hoodies",
+  "version": "1.0.0",
+  "units": {
+    "recommended_gsm": "grams per square metre; display adds '+' where heavier weights are common"
+  },
+  "enums": {
+    "gender_category": [
+      "Men",
+      "Women",
+      "Unisex"
+    ],
+    "sub_category": [
+      "Closure",
+      "Silhouette",
+      "Functional/Sleeve",
+      "Fabric"
+    ]
+  },
+  "items": [
+    {
+      "id": "unisex-pullover",
+      "name": "Pullover Hoodie",
+      "gender_category": "Unisex",
+      "sub_category": "Closure",
+      "description": "A closed-front hooded sweatshirt pulled on over the head, with an unbroken front panel and a single pouch pocket.",
+      "key_design_features": [
+        "uninterrupted front panel",
+        "kangaroo pocket",
+        "drawstring hood",
+        "ribbed cuffs and hem"
+      ],
+      "recommended_gsm": {
+        "min": 280,
+        "max": 450,
+        "display": "280–450 GSM"
+      }
+    },
+    {
+      "id": "unisex-full-zip",
+      "name": "Full-Zip Hoodie",
+      "gender_category": "Unisex",
+      "sub_category": "Closure",
+      "description": "A hooded sweatshirt opening fully down the centre front on a separating zip from hem to neckline.",
+      "key_design_features": [
+        "centre-front separating zip",
+        "split kangaroo pockets",
+        "zip garage at neck",
+        "drawstring hood"
+      ],
+      "recommended_gsm": {
+        "min": 280,
+        "max": 450,
+        "display": "280–450 GSM"
+      }
+    },
+    {
+      "id": "unisex-half-zip",
+      "name": "Half-Zip Hoodie",
+      "gender_category": "Unisex",
+      "sub_category": "Closure",
+      "description": "A pullover hoodie with a 10–12 in non-separating zip running from the neckline to mid-chest.",
+      "key_design_features": [
+        "mid-chest zip placket",
+        "non-separating zip",
+        "kangaroo pocket",
+        "ribbed hem"
+      ],
+      "recommended_gsm": {
+        "min": 260,
+        "max": 400,
+        "display": "260–400 GSM"
+      }
+    },
+    {
+      "id": "unisex-quarter-zip",
+      "name": "Quarter-Zip Hoodie",
+      "gender_category": "Unisex",
+      "sub_category": "Closure",
+      "description": "A pullover hoodie with a short 6–8 in neck zip that opens the collar without splitting the chest.",
+      "key_design_features": [
+        "short neck zip",
+        "zip guard at chin",
+        "pullover body",
+        "ribbed cuffs"
+      ],
+      "recommended_gsm": {
+        "min": 240,
+        "max": 380,
+        "display": "240–380 GSM"
+      }
+    },
+    {
+      "id": "unisex-two-way-zip",
+      "name": "Two-Way Zip Hoodie (Double-Zip)",
+      "gender_category": "Unisex",
+      "sub_category": "Closure",
+      "description": "A full-zip hoodie on a two-way separating zip with sliders at both ends, so it can open from the hem for sitting or layering.",
+      "key_design_features": [
+        "two-way separating zip",
+        "dual sliders",
+        "split welt pockets",
+        "drawstring hood"
+      ],
+      "recommended_gsm": {
+        "min": 300,
+        "max": 450,
+        "display": "300–450 GSM"
+      }
+    },
+    {
+      "id": "unisex-asymmetric-zip",
+      "name": "Asymmetric Zip Hoodie",
+      "gender_category": "Unisex",
+      "sub_category": "Closure",
+      "description": "A hoodie whose front zip runs on an off-centre diagonal from the hem to one side of a high collar.",
+      "key_design_features": [
+        "off-centre diagonal zip",
+        "overlapping front panels",
+        "high wrap collar",
+        "zip chest pocket"
+      ],
+      "recommended_gsm": {
+        "min": 300,
+        "max": 450,
+        "display": "300–450 GSM"
+      }
+    },
+    {
+      "id": "unisex-snap-front",
+      "name": "Snap-Front / Button-Front Hoodie",
+      "gender_category": "Unisex",
+      "sub_category": "Closure",
+      "description": "A hooded sweatshirt that opens down a centre-front placket fastened with metal snaps or buttons instead of a zip.",
+      "key_design_features": [
+        "front placket",
+        "metal snaps or buttons",
+        "patch pockets",
+        "lined hood"
+      ],
+      "recommended_gsm": {
+        "min": 300,
+        "max": 450,
+        "display": "300–450 GSM"
+      }
+    },
+    {
+      "id": "unisex-baja",
+      "name": "Lace-Up Baja Hoodie",
+      "gender_category": "Unisex",
+      "sub_category": "Closure",
+      "description": "A pullover hoodie in woven striped jacquard with a V-neck closed by cord lacing through eyelets.",
+      "key_design_features": [
+        "lace-up V-neck",
+        "woven jacquard stripes",
+        "kangaroo pocket",
+        "unlined hood"
+      ],
+      "recommended_gsm": {
+        "min": 300,
+        "max": 400,
+        "display": "300–400 GSM"
+      }
+    },
+    {
+      "id": "womens-cross-neck",
+      "name": "Cross-Neck Hoodie (Crossover Neck)",
+      "gender_category": "Women",
+      "sub_category": "Closure",
+      "description": "A pullover hoodie whose two front neck panels overlap in a crossover V below a drawstring-free hood.",
+      "key_design_features": [
+        "overlapping crossover neckline",
+        "no drawstring",
+        "fitted hood",
+        "ribbed cuffs"
+      ],
+      "recommended_gsm": {
+        "min": 220,
+        "max": 350,
+        "display": "220–350 GSM"
+      }
+    },
+    {
+      "id": "unisex-funnel-neck",
+      "name": "Funnel-Neck / Cowl-Neck Hoodie",
+      "gender_category": "Unisex",
+      "sub_category": "Closure",
+      "description": "A pullover with a tall stand-up funnel collar that rises directly into the hood and can be worn up to cover the chin.",
+      "key_design_features": [
+        "tall funnel collar",
+        "hood rises from collar",
+        "toggle drawcord",
+        "no front opening"
+      ],
+      "recommended_gsm": {
+        "min": 320,
+        "max": 450,
+        "display": "320–450 GSM"
+      }
+    },
+    {
+      "id": "unisex-regular-fit",
+      "name": "Regular / Classic Fit Hoodie",
+      "gender_category": "Unisex",
+      "sub_category": "Silhouette",
+      "description": "A straight-cut hoodie with set-in shoulders at the natural shoulder point, moderate chest ease and a hip-length ribbed hem.",
+      "key_design_features": [
+        "straight body",
+        "natural shoulder line",
+        "hip-length hem",
+        "moderate ease"
+      ],
+      "recommended_gsm": {
+        "min": 280,
+        "max": 400,
+        "display": "280–400 GSM"
+      }
+    },
+    {
+      "id": "mens-slim-fit",
+      "name": "Slim / Athletic Fit Hoodie",
+      "gender_category": "Men",
+      "sub_category": "Silhouette",
+      "description": "A close-fitting hoodie cut narrow through the chest, waist and sleeves, usually with stretch, for a trim athletic line.",
+      "key_design_features": [
+        "narrow body",
+        "slim sleeves",
+        "stretch knit",
+        "fitted hood"
+      ],
+      "recommended_gsm": {
+        "min": 220,
+        "max": 330,
+        "display": "220–330 GSM"
+      }
+    },
+    {
+      "id": "unisex-oversized",
+      "name": "Oversized Hoodie",
+      "gender_category": "Unisex",
+      "sub_category": "Silhouette",
+      "description": "A deliberately roomy hoodie with generous chest ease, dropped shoulders, long sleeves that stack at the cuff and an oversized hood.",
+      "key_design_features": [
+        "generous chest ease",
+        "dropped shoulders",
+        "stacked long sleeves",
+        "oversized hood"
+      ],
+      "recommended_gsm": {
+        "min": 380,
+        "max": 500,
+        "display": "380–500 GSM"
+      }
+    },
+    {
+      "id": "unisex-drop-shoulder",
+      "name": "Drop-Shoulder Hoodie",
+      "gender_category": "Unisex",
+      "sub_category": "Silhouette",
+      "description": "A hoodie whose shoulder seam sits 2–4 in down the upper arm, giving a relaxed sloping shoulder with a regular-length body.",
+      "key_design_features": [
+        "dropped shoulder seam",
+        "relaxed armhole",
+        "regular length",
+        "kangaroo pocket"
+      ],
+      "recommended_gsm": {
+        "min": 350,
+        "max": 480,
+        "display": "350–480 GSM"
+      }
+    },
+    {
+      "id": "mens-boxy",
+      "name": "Boxy Hoodie",
+      "gender_category": "Men",
+      "sub_category": "Silhouette",
+      "description": "A wide, short and square hoodie with the same width from chest to hem, a cropped-to-hip length and a structured heavyweight drape.",
+      "key_design_features": [
+        "square silhouette",
+        "wide straight hem",
+        "shortened body length",
+        "double-lined hood"
+      ],
+      "recommended_gsm": {
+        "min": 400,
+        "max": 550,
+        "display": "400–550+ GSM"
+      }
+    },
+    {
+      "id": "mens-longline",
+      "name": "Longline Hoodie",
+      "gender_category": "Men",
+      "sub_category": "Silhouette",
+      "description": "An elongated hoodie that extends to mid-thigh, often with a curved drop hem and side splits.",
+      "key_design_features": [
+        "extended body length",
+        "curved drop hem",
+        "side splits",
+        "slim sleeves"
+      ],
+      "recommended_gsm": {
+        "min": 260,
+        "max": 380,
+        "display": "260–380 GSM"
+      }
+    },
+    {
+      "id": "mens-muscle-tapered",
+      "name": "Muscle / Tapered Fit Hoodie",
+      "gender_category": "Men",
+      "sub_category": "Silhouette",
+      "description": "A hoodie cut fuller through the chest and shoulders and tapering sharply to a fitted waist, with snug sleeves that show the arms.",
+      "key_design_features": [
+        "fuller chest",
+        "tapered waist",
+        "snug sleeves",
+        "short cuffs"
+      ],
+      "recommended_gsm": {
+        "min": 240,
+        "max": 340,
+        "display": "240–340 GSM"
+      }
+    },
+    {
+      "id": "womens-micro-crop",
+      "name": "Micro-Crop Hoodie",
+      "gender_category": "Women",
+      "sub_category": "Silhouette",
+      "description": "An extreme crop ending just below the bust, with a raw or narrow banded hem.",
+      "key_design_features": [
+        "hem below bust",
+        "raw or narrow band hem",
+        "boxy upper body",
+        "drawstring hood"
+      ],
+      "recommended_gsm": {
+        "min": 220,
+        "max": 320,
+        "display": "220–320 GSM"
+      }
+    },
+    {
+      "id": "womens-waist-crop",
+      "name": "Waist-Length Cropped Hoodie",
+      "gender_category": "Women",
+      "sub_category": "Silhouette",
+      "description": "A hoodie cropped to the natural waist so it meets high-rise bottoms, finished with a ribbed or drawcord hem.",
+      "key_design_features": [
+        "natural-waist length",
+        "ribbed or drawcord hem",
+        "relaxed body",
+        "kangaroo pocket"
+      ],
+      "recommended_gsm": {
+        "min": 260,
+        "max": 380,
+        "display": "260–380 GSM"
+      }
+    },
+    {
+      "id": "womens-boyfriend",
+      "name": "Boyfriend Fit Hoodie",
+      "gender_category": "Women",
+      "sub_category": "Silhouette",
+      "description": "A relaxed women's hoodie borrowed from menswear proportions: wider body, dropped shoulders and longer sleeves.",
+      "key_design_features": [
+        "menswear proportions",
+        "dropped shoulders",
+        "longer sleeves",
+        "relaxed hip-length body"
+      ],
+      "recommended_gsm": {
+        "min": 320,
+        "max": 450,
+        "display": "320–450 GSM"
+      }
+    },
+    {
+      "id": "womens-fitted-sculpted",
+      "name": "Fitted / Sculpted Hoodie",
+      "gender_category": "Women",
+      "sub_category": "Silhouette",
+      "description": "A body-skimming women's hoodie with princess or side shaping seams that follow the bust, waist and hip.",
+      "key_design_features": [
+        "princess or shaping seams",
+        "defined waist",
+        "stretch knit",
+        "slim sleeves"
+      ],
+      "recommended_gsm": {
+        "min": 220,
+        "max": 320,
+        "display": "220–320 GSM"
+      }
+    },
+    {
+      "id": "womens-hoodie-dress",
+      "name": "Hoodie Dress / Tunic Hoodie",
+      "gender_category": "Women",
+      "sub_category": "Silhouette",
+      "description": "A hoodie extended to tunic or mini-dress length, ending between the upper thigh and the knee.",
+      "key_design_features": [
+        "thigh-to-knee length",
+        "optional waist drawcord",
+        "side splits",
+        "kangaroo pocket"
+      ],
+      "recommended_gsm": {
+        "min": 240,
+        "max": 360,
+        "display": "240–360 GSM"
+      }
+    },
+    {
+      "id": "womens-dolman",
+      "name": "Dolman / Batwing Sleeve Hoodie",
+      "gender_category": "Women",
+      "sub_category": "Silhouette",
+      "description": "A hoodie whose sleeves are cut in one with the body, forming a deep armhole that drops to the waist and tapers to a fitted cuff.",
+      "key_design_features": [
+        "cut-in-one sleeves",
+        "deep armhole to waist",
+        "tapered fitted cuffs",
+        "relaxed upper body"
+      ],
+      "recommended_gsm": {
+        "min": 220,
+        "max": 320,
+        "display": "220–320 GSM"
+      }
+    },
+    {
+      "id": "womens-wrap-ruched",
+      "name": "Wrap / Ruched-Front Hoodie",
+      "gender_category": "Women",
+      "sub_category": "Silhouette",
+      "description": "A hoodie whose front is wrapped across the body or gathered in ruching at the side or centre front to shape the waist.",
+      "key_design_features": [
+        "wrap or overlapping front",
+        "gathered ruching",
+        "side tie or drawcord",
+        "waist definition"
+      ],
+      "recommended_gsm": {
+        "min": 200,
+        "max": 300,
+        "display": "200–300 GSM"
+      }
+    },
+    {
+      "id": "womens-high-low",
+      "name": "High-Low Hem Hoodie",
+      "gender_category": "Women",
+      "sub_category": "Silhouette",
+      "description": "A hoodie with a hem that is shorter at the front and drops longer at the back, often with side splits.",
+      "key_design_features": [
+        "shorter front hem",
+        "dropped back hem",
+        "side splits",
+        "curved hemline"
+      ],
+      "recommended_gsm": {
+        "min": 240,
+        "max": 340,
+        "display": "240–340 GSM"
+      }
+    },
+    {
+      "id": "womens-off-shoulder",
+      "name": "Off-the-Shoulder Hoodie",
+      "gender_category": "Women",
+      "sub_category": "Silhouette",
+      "description": "A hoodie with a wide slash or boat neckline that slips off one or both shoulders, with the hood attached at the back neck.",
+      "key_design_features": [
+        "wide slash neckline",
+        "exposed shoulder",
+        "back-set hood",
+        "relaxed body"
+      ],
+      "recommended_gsm": {
+        "min": 200,
+        "max": 300,
+        "display": "200–300 GSM"
+      }
+    },
+    {
+      "id": "unisex-set-in-sleeve",
+      "name": "Set-In Sleeve Hoodie",
+      "gender_category": "Unisex",
+      "sub_category": "Functional/Sleeve",
+      "description": "A long-sleeve hoodie whose sleeves are sewn into a rounded armhole at the shoulder point, giving a tailored shoulder line.",
+      "key_design_features": [
+        "armhole seam at shoulder point",
+        "shaped sleeve cap",
+        "tailored shoulder",
+        "ribbed cuffs"
+      ],
+      "recommended_gsm": {
+        "min": 260,
+        "max": 450,
+        "display": "260–450 GSM"
+      }
+    },
+    {
+      "id": "unisex-raglan-sleeve",
+      "name": "Raglan Sleeve Hoodie",
+      "gender_category": "Unisex",
+      "sub_category": "Functional/Sleeve",
+      "description": "A long-sleeve hoodie whose sleeves run in one piece diagonally from the underarm to the collar, with no shoulder seam.",
+      "key_design_features": [
+        "diagonal raglan seams",
+        "no shoulder seam",
+        "wide range of movement",
+        "contrast sleeve option"
+      ],
+      "recommended_gsm": {
+        "min": 260,
+        "max": 400,
+        "display": "260–400 GSM"
+      }
+    },
+    {
+      "id": "unisex-short-sleeve",
+      "name": "Short-Sleeve Hoodie",
+      "gender_category": "Unisex",
+      "sub_category": "Functional/Sleeve",
+      "description": "A hoodie with tee-length short sleeves ending at mid-bicep, for warm weather or layering.",
+      "key_design_features": [
+        "mid-bicep sleeves",
+        "hemmed or ribbed sleeve ends",
+        "lightweight body",
+        "drawstring hood"
+      ],
+      "recommended_gsm": {
+        "min": 200,
+        "max": 300,
+        "display": "200–300 GSM"
+      }
+    },
+    {
+      "id": "unisex-sleeveless",
+      "name": "Sleeveless / Cutoff Hoodie",
+      "gender_category": "Unisex",
+      "sub_category": "Functional/Sleeve",
+      "description": "A hoodie with the sleeves removed, leaving deep or raw-edged armholes, typically for training.",
+      "key_design_features": [
+        "deep armholes",
+        "raw or bound arm edges",
+        "dropped side panels",
+        "drawstring hood"
+      ],
+      "recommended_gsm": {
+        "min": 220,
+        "max": 330,
+        "display": "220–330 GSM"
+      }
+    },
+    {
+      "id": "unisex-thumbhole",
+      "name": "Thumbhole Cuff Hoodie",
+      "gender_category": "Unisex",
+      "sub_category": "Functional/Sleeve",
+      "description": "A hoodie with extended cuffs that have a thumb opening, so the sleeves stay over the back of the hand.",
+      "key_design_features": [
+        "extended cuffs",
+        "thumb openings",
+        "hand coverage",
+        "slim sleeves"
+      ],
+      "recommended_gsm": {
+        "min": 220,
+        "max": 330,
+        "display": "220–330 GSM"
+      }
+    },
+    {
+      "id": "unisex-tech-utility",
+      "name": "Tech / Utility Hoodie",
+      "gender_category": "Unisex",
+      "sub_category": "Functional/Sleeve",
+      "description": "A performance hoodie with bonded or taped seams, zip-secured pockets and technical trims such as reflective details.",
+      "key_design_features": [
+        "taped or bonded seams",
+        "zip-secured pockets",
+        "reflective details",
+        "adjustable hood"
+      ],
+      "recommended_gsm": {
+        "min": 280,
+        "max": 380,
+        "display": "280–380 GSM"
+      }
+    },
+    {
+      "id": "unisex-balaclava",
+      "name": "Balaclava / Ninja Hood Hoodie",
+      "gender_category": "Unisex",
+      "sub_category": "Functional/Sleeve",
+      "description": "A hoodie with an extended hood that wraps the neck and lower face, leaving an eye opening or a zip-down face panel.",
+      "key_design_features": [
+        "face-covering hood",
+        "eye opening or zip mask",
+        "wrapped neck",
+        "fitted crown"
+      ],
+      "recommended_gsm": {
+        "min": 300,
+        "max": 450,
+        "display": "300–450 GSM"
+      }
+    },
+    {
+      "id": "unisex-double-lined-hood",
+      "name": "Double-Lined Hood Hoodie (No Drawstring)",
+      "gender_category": "Unisex",
+      "sub_category": "Functional/Sleeve",
+      "description": "A hoodie with a two-layer, self-lined hood that holds its shape without a drawstring.",
+      "key_design_features": [
+        "two-layer self-lined hood",
+        "no drawstring or eyelets",
+        "structured hood shape",
+        "clean neckline"
+      ],
+      "recommended_gsm": {
+        "min": 350,
+        "max": 500,
+        "display": "350–500 GSM"
+      }
+    },
+    {
+      "id": "unisex-lightweight-jersey",
+      "name": "Lightweight Jersey",
+      "gender_category": "Unisex",
+      "sub_category": "Fabric",
+      "description": "A smooth, single-faced knit with a flat face and light drape, used for summer and layering hoodies.",
+      "key_design_features": [
+        "single jersey knit",
+        "smooth flat face",
+        "light drape",
+        "minimal shrinkage when pre-shrunk"
+      ],
+      "recommended_gsm": {
+        "min": 180,
+        "max": 260,
+        "display": "180–260 GSM"
+      }
+    },
+    {
+      "id": "unisex-french-terry",
+      "name": "French Terry",
+      "gender_category": "Unisex",
+      "sub_category": "Fabric",
+      "description": "A knit with a smooth face and unbrushed looped back, giving a breathable, mid-weight, all-season hand.",
+      "key_design_features": [
+        "smooth face",
+        "looped unbrushed back",
+        "breathable",
+        "mid-weight drape"
+      ],
+      "recommended_gsm": {
+        "min": 280,
+        "max": 380,
+        "display": "280–380 GSM"
+      }
+    },
+    {
+      "id": "unisex-brushed-fleece",
+      "name": "Heavyweight Brushed Fleece",
+      "gender_category": "Unisex",
+      "sub_category": "Fabric",
+      "description": "A dense loopback knit whose back has been brushed into a soft, warm nap, giving a thick structured hoodie body.",
+      "key_design_features": [
+        "brushed napped back",
+        "dense structured body",
+        "high warmth",
+        "minimal drape"
+      ],
+      "recommended_gsm": {
+        "min": 400,
+        "max": 550,
+        "display": "400–550+ GSM"
+      }
+    },
+    {
+      "id": "unisex-tech-fleece",
+      "name": "Tech Fleece (Bonded Spacer)",
+      "gender_category": "Unisex",
+      "sub_category": "Fabric",
+      "description": "A spacer-knit fabric that traps air between two bonded faces, giving warmth without bulk and a smooth sculpted surface.",
+      "key_design_features": [
+        "double-face spacer construction",
+        "smooth outer face",
+        "lightweight warmth",
+        "clean bonded edges"
+      ],
+      "recommended_gsm": {
+        "min": 300,
+        "max": 420,
+        "display": "300–420 GSM"
+      }
+    },
+    {
+      "id": "unisex-sherpa-borg",
+      "name": "Sherpa / Borg",
+      "gender_category": "Unisex",
+      "sub_category": "Fabric",
+      "description": "A high-pile fleece imitating shearling, used as a full shell or as a hood and body lining.",
+      "key_design_features": [
+        "high-pile curly face",
+        "shearling look",
+        "very high warmth",
+        "often a contrast lining"
+      ],
+      "recommended_gsm": {
+        "min": 300,
+        "max": 500,
+        "display": "300–500 GSM"
+      }
+    },
+    {
+      "id": "unisex-waffle-thermal",
+      "name": "Waffle / Thermal Knit",
+      "gender_category": "Unisex",
+      "sub_category": "Fabric",
+      "description": "A knit with a raised square-grid texture whose pockets trap warm air while staying breathable.",
+      "key_design_features": [
+        "raised waffle grid",
+        "air-trapping texture",
+        "breathable",
+        "light-to-mid weight"
+      ],
+      "recommended_gsm": {
+        "min": 200,
+        "max": 320,
+        "display": "200–320 GSM"
+      }
+    },
+    {
+      "id": "unisex-cable-sweater-knit",
+      "name": "Cable / Sweater Knit",
+      "gender_category": "Unisex",
+      "sub_category": "Fabric",
+      "description": "A flat- or circular-knit yarn construction with cable or rib patterns, giving a sweater hoodie with visible stitch texture.",
+      "key_design_features": [
+        "visible stitch texture",
+        "cable or rib patterns",
+        "fully fashioned panels",
+        "knitted-in trims"
+      ],
+      "recommended_gsm": {
+        "min": 350,
+        "max": 550,
+        "display": "350–550 GSM"
+      }
+    },
+    {
+      "id": "unisex-velour-terry-cloth",
+      "name": "Velour / Terry Cloth",
+      "gender_category": "Unisex",
+      "sub_category": "Fabric",
+      "description": "A plush pile fabric: velour has a cut pile with a soft sheen, while terry cloth has an uncut looped pile on the face.",
+      "key_design_features": [
+        "plush pile face",
+        "cut pile with sheen (velour)",
+        "looped towelling pile (terry)",
+        "soft drape"
+      ],
+      "recommended_gsm": {
+        "min": 280,
+        "max": 400,
+        "display": "280–400 GSM"
+      }
+    }
+  ]
+}

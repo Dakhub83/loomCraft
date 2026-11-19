@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hoodieCatalog.schema.json",
+  "title": "Hoodie catalog",
+  "type": "object",
+  "required": [
+    "catalog",
+    "version",
+    "enums",
+    "items"
+  ],
+  "properties": {
+    "catalog": {
+      "const": "hoodies"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "units": {
+      "type": "object"
+    },
+    "enums": {
+      "type": "object"
+    },
+    "items": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "gender_category",
+          "sub_category",
+          "description",
+          "key_design_features",
+          "recommended_gsm"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^(mens|womens|unisex)-[a-z0-9]+(-[a-z0-9]+)*$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "gender_category": {
+            "enum": [
+              "Men",
+              "Women",
+              "Unisex"
+            ]
+          },
+          "sub_category": {
+            "enum": [
+              "Closure",
+              "Silhouette",
+              "Functional/Sleeve",
+              "Fabric"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "key_design_features": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 4,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "recommended_gsm": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "min",
+              "max",
+              "display"
+            ],
+            "properties": {
+              "min": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "max": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "display": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
