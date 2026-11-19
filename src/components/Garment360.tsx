@@ -2,13 +2,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { Box, Camera, Check, ChevronUp, Layers, Loader2, Pause, Play, PersonStanding, RotateCcw, Scissors, X } from 'lucide-react';
+import { Box, Camera, Check, ChevronUp, Film, Layers, Loader2, Pause, Play, PersonStanding, RotateCcw, Scissors, X } from 'lucide-react';
 import { getGarment, viewLabel } from '../data/garments';
 import { FABRICS, defaultFabricFor, fabricFor } from '../data/fabrics';
 import type { GarmentId, ViewDesigns, ViewEffects } from '../types';
 import { buildFlatLay, type Built } from '../three/flatLay';
 import { buildModelScene, type ModelBuilt } from '../three/modelScene';
 import { hasGarmentModel } from '../three/garmentModels';
+import SpinMockupPanel, { type SpinRequest } from './SpinMockupPanel';
+import { exportSpin, type FrameSource } from '../utils/spinMockup';
 
 /* ================================================================================================
  * 360° viewer. Two modes:
@@ -44,9 +46,17 @@ const PRESETS: Array<{ id: string; label: string; azimuth: number; polar?: numbe
 
 interface Fit {
   center: THREE.Vector3;
+  size: THREE.Vector3;
   dist: number;
   halfX: number;
   halfZ: number;
+}
+
+/** Camera distance that fits the framing box for this camera's fov and aspect. */
+function fitDistance(size: THREE.Vector3, camera: THREE.PerspectiveCamera) {
+  const vFov = THREE.MathUtils.degToRad(camera.fov);
+  const hFov = 2 * Math.atan(Math.tan(vFov / 2) * camera.aspect);
+  return Math.max(size.y / 2 / Math.tan(vFov / 2), Math.max(size.x, size.z) / 2 / Math.tan(hFov / 2)) * 1.3 + size.z / 2;
 }
 
 export default function Garment360({ name, garment, color, designs, effects, fabricId, onFabric, onClose, onError }: Props) {
@@ -62,7 +72,11 @@ export default function Garment360({ name, garment, color, designs, effects, fab
     builtKey: string;
     fit: Fit | null;
     tween: { from: THREE.Vector3; to: THREE.Vector3; t: number } | null;
+    /** Aligns the cutaway plane and mannequin visibility with the camera; returns the view angle in degrees. */
+    syncView(): number;
   } | null>(null);
+  /** While a 360° mockup renders, the live loop pauses so it doesn't fight over the camera. */
+  const capturing = useRef(false);
   const canModel = hasGarmentModel(garment);
   const [mode, setMode] = useState<Mode>(canModel ? 'model' : 'flat');
   const effectiveMode: Mode = canModel ? mode : 'flat';
@@ -73,6 +87,14 @@ export default function Garment360({ name, garment, color, designs, effects, fab
   const [showMannequin, setShowMannequin] = useState(true);
   const [fabricOpen, setFabricOpen] = useState(false);
   const [missing, setMissing] = useState<string[]>([]);
+  const [mockOpen, setMockOpen] = useState(false);
+  const [spinJob, setSpinJob] = useState<{ running: boolean; progress: number; label: string; done: { filename: string; bytes: number } | null }>({
+    running: false,
+    progress: 0,
+    label: '',
+    done: null,
+  });
+  const spinAbort = useRef<AbortController | null>(null);
   const cutRef = useRef(cut);
   cutRef.current = cut;
   const mannequinRef = useRef(showMannequin);
@@ -137,7 +159,24 @@ export default function Garment360({ name, garment, color, designs, effects, fab
     });
 
     const clip = new THREE.Plane(new THREE.Vector3(0, 0, -1), 1e4);
-    three.current = { renderer, scene, camera, controls, clip, keyTarget, built: null, builtKey: '', fit: null, tween: null };
+    const dir = new THREE.Vector3();
+    const syncView = () => {
+      const st = three.current!;
+      // camera-facing cutaway: remove everything nearer to the camera than `k`
+      dir.copy(camera.position).sub(controls.target);
+      dir.y = 0;
+      if (dir.lengthSq() < 1e-6) dir.set(0, 0, 1);
+      dir.normalize();
+      const fit = st.fit;
+      const extent = fit ? Math.abs(dir.x) * fit.halfX + Math.abs(dir.z) * fit.halfZ : 10;
+      const c = cutRef.current;
+      const ox = fit ? fit.center.x * -dir.x + fit.center.z * -dir.z : 0;
+      clip.normal.set(-dir.x, 0, -dir.z);
+      clip.constant = c <= 0 ? 1e4 : extent * (1 - c) + 0.05 - c * 0.2 - ox;
+      if (st.built?.mannequin) st.built.mannequin.visible = mannequinRef.current && c <= 0;
+      return Math.round(((THREE.MathUtils.radToDeg(Math.atan2(dir.x, dir.z)) % 360) + 360) % 360);
+    };
+    three.current = { renderer, scene, camera, controls, clip, keyTarget, built: null, builtKey: '', fit: null, tween: null, syncView };
 
     const resize = () => {
       const w = host.clientWidth;
@@ -152,9 +191,9 @@ export default function Garment360({ name, garment, color, designs, effects, fab
 
     let raf = 0;
     let lastAngle = 999;
-    const dir = new THREE.Vector3();
     const tick = () => {
       raf = requestAnimationFrame(tick);
+      if (capturing.current) return;
       const st = three.current!;
       if (st.tween) {
         st.tween.t = Math.min(1, st.tween.t + 0.045);
@@ -166,21 +205,7 @@ export default function Garment360({ name, garment, color, designs, effects, fab
       }
       controls.update();
       keyTarget.position.copy(controls.target);
-
-      // camera-facing cutaway: remove everything nearer to the camera than `k`
-      dir.copy(camera.position).sub(controls.target);
-      dir.y = 0;
-      if (dir.lengthSq() < 1e-6) dir.set(0, 0, 1);
-      dir.normalize();
-      const fit = st.fit;
-      const extent = fit ? Math.abs(dir.x) * fit.halfX + Math.abs(dir.z) * fit.halfZ : 10;
-      const c = cutRef.current;
-      const ox = fit ? fit.center.x * -dir.x + fit.center.z * -dir.z : 0;
-      clip.normal.set(-dir.x, 0, -dir.z);
-      clip.constant = c <= 0 ? 1e4 : extent * (1 - c) + 0.05 - c * 0.2 - ox;
-      if (st.built?.mannequin) st.built.mannequin.visible = mannequinRef.current && c <= 0;
-
-      const deg = Math.round(((THREE.MathUtils.radToDeg(Math.atan2(dir.x, dir.z)) % 360) + 360) % 360);
+      const deg = st.syncView();
       if (deg !== lastAngle) {
         lastAngle = deg;
         setAngle(deg);
@@ -248,10 +273,8 @@ export default function Garment360({ name, garment, color, designs, effects, fab
           const f = built.frame;
           const center = f.getCenter(new THREE.Vector3());
           const size = f.getSize(new THREE.Vector3());
-          const vFov = THREE.MathUtils.degToRad(st.camera.fov);
-          const hFov = 2 * Math.atan(Math.tan(vFov / 2) * st.camera.aspect);
-          const dist = Math.max(size.y / 2 / Math.tan(vFov / 2), Math.max(size.x, size.z) / 2 / Math.tan(hFov / 2)) * 1.3 + size.z / 2;
-          st.fit = { center, dist, halfX: size.x / 2, halfZ: size.z / 2 };
+          const dist = fitDistance(size, st.camera);
+          st.fit = { center, size, dist, halfX: size.x / 2, halfZ: size.z / 2 };
           st.controls.target.copy(center);
           st.controls.minDistance = dist * 0.35;
           st.controls.maxDistance = dist * 2.4;
@@ -278,7 +301,9 @@ export default function Garment360({ name, garment, color, designs, effects, fab
       const t = e.target as HTMLElement;
       if (t.closest('input, textarea, select, [role="dialog"]')) return;
       if (e.key === 'Escape') {
-        if (fabricOpen) setFabricOpen(false);
+        if (spinJob.running) return;
+        if (mockOpen) setMockOpen(false);
+        else if (fabricOpen) setFabricOpen(false);
         else onClose();
       } else if (e.key === ' ') {
         e.preventDefault();
@@ -287,7 +312,7 @@ export default function Garment360({ name, garment, color, designs, effects, fab
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose, fabricOpen]);
+  }, [onClose, fabricOpen, mockOpen, spinJob.running]);
 
   const goTo = useCallback((p: (typeof PRESETS)[number], dist?: number) => {
     const st = three.current;
@@ -300,6 +325,85 @@ export default function Garment360({ name, garment, color, designs, effects, fab
     const to = new THREE.Vector3().setFromSphericalCoords(r, polar, p.azimuth);
     st.tween = { from, to, t: 0 };
   }, []);
+
+  /* ---------- 360° mockup export ---------- */
+  const frameSource = (): FrameSource | null => {
+    const st = three.current;
+    if (!st || !st.fit) return null;
+    const { renderer, camera, controls } = st;
+    const fit = st.fit;
+    const saved = {
+      ratio: renderer.getPixelRatio(),
+      size: renderer.getSize(new THREE.Vector2()),
+      aspect: camera.aspect,
+      position: camera.position.clone(),
+      quaternion: camera.quaternion.clone(),
+    };
+    const target = controls.target.clone();
+    const polar = controls.getPolarAngle();
+    // keep the user's zoom, refitted to the output's aspect ratio
+    const zoom = camera.position.distanceTo(target) / fit.dist;
+    const offset = new THREE.Vector3();
+    let dist = fit.dist;
+    return {
+      begin(width, height) {
+        capturing.current = true;
+        renderer.setPixelRatio(1);
+        renderer.setSize(width, height, false);
+        camera.aspect = width / height;
+        camera.updateProjectionMatrix();
+        dist = fitDistance(fit.size, camera) * zoom;
+      },
+      render(azimuth) {
+        offset.setFromSphericalCoords(dist, polar, azimuth);
+        camera.position.copy(target).add(offset);
+        camera.lookAt(target);
+        camera.updateMatrixWorld();
+        st.keyTarget.position.copy(target);
+        st.syncView();
+        renderer.render(st.scene, camera);
+        return renderer.domElement;
+      },
+      end() {
+        renderer.setPixelRatio(saved.ratio);
+        renderer.setSize(saved.size.x, saved.size.y, false);
+        camera.aspect = saved.aspect;
+        camera.updateProjectionMatrix();
+        camera.position.copy(saved.position);
+        camera.quaternion.copy(saved.quaternion);
+        controls.update();
+        capturing.current = false;
+      },
+    };
+  };
+
+  const startSpin = async (req: SpinRequest) => {
+    const source = frameSource();
+    if (!source) return;
+    const abort = new AbortController();
+    spinAbort.current = abort;
+    setSpinJob({ running: true, progress: 0, label: 'Preparing', done: null });
+    try {
+      const { blob, filename } = await exportSpin(source, {
+        ...req,
+        name,
+        signal: abort.signal,
+        onProgress: (progress, label) => setSpinJob((j) => ({ ...j, progress, label })),
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+      setSpinJob({ running: false, progress: 1, label: '', done: { filename, bytes: blob.size } });
+    } catch (e) {
+      setSpinJob({ running: false, progress: 0, label: '', done: null });
+      if ((e as Error).name !== 'AbortError') onError(`360° mockup failed: ${(e as Error).message}`);
+    } finally {
+      spinAbort.current = null;
+    }
+  };
 
   const reset = () => {
     setCut(0);
@@ -362,11 +466,39 @@ export default function Garment360({ name, garment, color, designs, effects, fab
           <button onClick={snapshot} className="lc-btn h-8 gap-1.5 px-2.5 text-xs" title="Download this angle as PNG">
             <Camera size={14} /> Snapshot
           </button>
+          <button
+            onClick={() => setMockOpen((o) => !o)}
+            disabled={loading && !spinJob.running}
+            aria-expanded={mockOpen}
+            className={`lc-btn h-8 gap-1.5 px-2.5 text-xs disabled:opacity-50 ${mockOpen ? 'border-violet-500/60 text-violet-200' : ''}`}
+            title="Export a spinning 360° mockup: video, GIF, web spin or frames"
+          >
+            <Film size={14} /> 360° Mockup
+          </button>
           <button onClick={onClose} className="lc-btn h-8 w-8 p-0" title="Close 360° preview (Esc)">
             <X size={15} />
           </button>
         </div>
       </div>
+
+      {mockOpen && (
+        <SpinMockupPanel
+          running={spinJob.running}
+          progress={spinJob.progress}
+          label={spinJob.label}
+          done={spinJob.done}
+          onStart={startSpin}
+          onCancel={() => spinAbort.current?.abort()}
+          onClose={() => setMockOpen(false)}
+        />
+      )}
+      {spinJob.running && (
+        <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center bg-[#0a0a0c]/70 backdrop-blur-sm">
+          <span className="flex items-center gap-2 rounded-lg bg-black/60 px-3 py-2 text-xs text-zinc-200">
+            <Loader2 size={14} className="animate-spin text-violet-400" /> Rendering 360° mockup… {Math.round(spinJob.progress * 100)}%
+          </span>
+        </div>
+      )}
 
       {loading && (
         <div className="pointer-events-none absolute inset-0 grid place-items-center">
