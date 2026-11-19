@@ -596,6 +596,8 @@ export async function exportProductionZip(
     });
   }
 
+  if (!reports.length) throw new Error('The artwork sits outside the print area on every view. Move it inside the dashed print area and export again.');
+
   const chart = s.sizeCharts?.[s.garment] ?? defaultSizeChart(s.garment);
   const csvName = `specs/${slug}-size-chart.csv`;
   zip.file(csvName, chartToCSV(chart, getGarment(s.garment).name, s.mfgSpecs?.[s.garment]), { compression: 'DEFLATE' });

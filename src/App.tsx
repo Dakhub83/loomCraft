@@ -119,6 +119,12 @@ function Studio({ initial, initialCustoms }: { initial: Workspace | null; initia
   const stageRef = useRef<HTMLDivElement>(null);
   const pendingPlacement = useRef<PlacementPreset | null>(null);
   const canvasWaiters = useRef<Array<() => void>>([]);
+  /**
+   * The print-zone size each view's artwork was last fitted to. Artwork on a view the current garment
+   * lacks is carried along untouched (Tee → Sneaker → Backpack keeps the tee's front), so it has to be
+   * refitted from the zone it was made for, not from the garment we're leaving.
+   */
+  const fittedZones = useRef<Record<ViewId, { w: number; h: number }>>({});
 
   const state = { name, draftId, garment, color, view, designs, effects, sizeCharts, mfgSpecs, fabrics };
   const stateRef = useRef(state);
@@ -218,13 +224,18 @@ function Studio({ initial, initialCustoms }: { initial: Workspace | null; initia
   const changeGarment = (g: GarmentId, fromZones?: Record<ViewId, { w: number; h: number }>) => {
     if (g === garment && !fromZones) return;
     const next = { ...designs };
-    // Artwork on views both garments share is refitted to the new print zones. Views the new garment
-    // lacks are kept untouched, so switching back restores them.
+    // Artwork is refitted to the new print zones from the zone it was last fitted to (the current
+    // garment's for its own views). Views the new garment lacks are kept untouched, so switching back
+    // (directly or via other garments) restores them.
+    const fitted = { ...fittedZones.current };
+    for (const v of garmentViews(garment)) fitted[v.id] = getZone(garment, v.id);
     for (const v of garmentViews(g)) {
       const json = designs[v.id];
-      const from = fromZones?.[v.id] ?? (hasView(garment, v.id) ? getZone(garment, v.id) : null);
+      const from = fromZones?.[v.id] ?? fitted[v.id];
       if (json && from) next[v.id] = refitDesign(json, from, v.zone);
+      fitted[v.id] = v.zone;
     }
+    fittedZones.current = fitted;
     setDesigns(next);
     setGarment(g);
     if (!hasView(g, view)) setView(firstView(g));
@@ -405,6 +416,7 @@ function Studio({ initial, initialCustoms }: { initial: Workspace | null; initia
     setGarment(g);
     setColor(d.color);
     setDesigns({ ...emptyDesigns(), ...d.designs });
+    fittedZones.current = {};
     setEffects({ ...defaultEffects(), ...d.effects });
     setSizeCharts(d.sizeCharts ?? {});
     setMfgSpecs(d.mfgSpecs ?? {});
@@ -422,6 +434,7 @@ function Studio({ initial, initialCustoms }: { initial: Workspace | null; initia
     setName(DEFAULT_NAME);
     setDraftId(null);
     setDesigns(emptyDesigns());
+    fittedZones.current = {};
     setEffects(defaultEffects());
     setSizeCharts({});
     setMfgSpecs({});
