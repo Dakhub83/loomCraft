@@ -19,6 +19,8 @@ export interface ModelBuilt extends Built {
   mannequin: THREE.Group | null;
   /** Views whose artwork has no place on this 3D model. */
   missingViews: ViewId[];
+  /** The soft floor shadow (on the floor under the mannequin, or under a standalone item). */
+  shadow: THREE.Mesh;
 }
 
 export function disposeTree(root: THREE.Object3D) {
@@ -110,6 +112,7 @@ export function buildModelScene(
     frame: f,
     mannequin,
     missingViews,
+    shadow,
     dispose: () => disposeTree(group),
   };
 }

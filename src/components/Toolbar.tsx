@@ -156,6 +156,8 @@ export function Toolbar(p: Props) {
       <GarmentPicker
         garment={p.garment}
         color={p.color}
+        fabricId={p.fabricId}
+        onColor={p.onColor}
         customGarments={p.customGarments}
         onGarment={p.onGarment}
         onAddCustom={p.onAddCustom}

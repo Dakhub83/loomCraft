@@ -31,6 +31,8 @@ The key is read by a small proxy inside the Vite dev/preview server (`server/cla
   - Soccer: Soccer Jersey (V-neck, mesh side panels), Goalkeeper Jersey (padded elbows), Training Quarter-Zip, Soccer Shorts, Soccer Socks, plus an Underlayer group: a compression Base Layer Top and Compression Shorts (sliding shorts) in a new Compression knit fabric. Each has print zones for crests, sponsors, back name and number, sleeve badges and shorts numbers, plus a kit-specific manufacturing profile.
   - Sets: Tracksuit Set, a full-zip track jacket (stand collar, rib cuffs and hem) with matching track pants (side stripes, rib cuffs), in a new Poly tricot fabric. Its views cover both pieces (Jacket, Jacket Back, Sleeve, Left Leg, Right Leg, Pants Back), its size chart grades jacket and pants measurements together, and the 3D model dresses the mannequin in both.
 
+  The picker shows each garment as a 3D thumbnail in your current colour. Hover a card for colour dots: hover a dot to preview the garment in that colour, click it to start with that garment and colour.
+
   Each garment has its own views (for example Front / Back / Left Leg / Right Leg, or Crown) and print areas sized in inches, and the UI and tech pack follow them.
 - **Photoshop import**: open a `.psd` from **Graphics → Import Photoshop project** (or drop it on the upload box).
   - Pick layers, and choose which view each top-level group goes to. Groups named Front, Back, Sleeve and so on are matched automatically, and hidden and background or mockup layers start unchecked.
