@@ -86,6 +86,7 @@ export const CATEGORIES: Array<{ id: GarmentCategory; label: string }> = [
   { id: 'bottoms', label: 'Bottoms' },
   { id: 'outerwear', label: 'Outerwear' },
   { id: 'soccer', label: 'Soccer' },
+  { id: 'sets', label: 'Sets' },
   { id: 'bags', label: 'Bags' },
   { id: 'footwear', label: 'Footwear' },
   { id: 'accessories', label: 'Headwear' },
@@ -1393,6 +1394,90 @@ const COMP_SHORTS: GarmentDef = {
   },
 };
 
+/* ------------------------------------------------------------------------- SETS */
+
+// Tracksuit: a full-zip track jacket (stand collar, rib cuffs and hem) and matching track pants with
+// side stripes, sold and printed as one set. Jacket views come first; the pant views follow.
+const TRACK_COLLAR: Panel[] = [
+  { d: 'M198,36 C214,42 236,44 247,44 L247,74 C228,74 212,68 200,64 Z' },
+  { d: 'M302,36 C286,42 264,44 253,44 L253,74 C272,74 288,68 300,64 Z' },
+];
+const TRACK_JACKET_FRONT: VectorArt = {
+  behind: [{ d: 'M198,36 C222,30 278,30 302,36 L300,60 C276,54 224,54 200,60 Z', tone: -0.38, flat: true }],
+  panels: [...CREW_SLEEVES, { d: `M200,64 C220,76 280,76 300,64 ${CREW_BELOW}` }, ...TRACK_COLLAR],
+  ribs: [...CREW_RIBS, { d: 'M250,44 L250,520', w: 7, tone: -0.28 }],
+  stitches: [
+    ...CREW_STITCH,
+    'M243,46 L243,476',
+    'M257,46 L257,476',
+    'M201,42 C216,47 236,49 246,49',
+    'M299,42 C284,47 264,49 254,49',
+    'M152,372 L172,436',
+    'M348,372 L328,436',
+  ],
+  folds: CREW_FOLDS,
+  eyelets: [[250, 60]],
+};
+const TRACK_JACKET_BACK: VectorArt = {
+  panels: [
+    ...CREW_SLEEVES,
+    { d: `M198,62 C222,72 278,72 302,62 ${CREW_BELOW}` },
+    { d: 'M198,36 C222,44 278,44 302,36 L302,62 C278,72 222,72 198,62 Z', tone: 0.02 },
+  ],
+  ribs: CREW_RIBS,
+  stitches: [...CREW_STITCH, 'M198,62 C222,72 278,72 302,62', 'M199,42 C222,50 278,50 301,42'],
+  folds: CREW_FOLDS,
+};
+const TRACK_STRIPES: Panel[] = [
+  { d: 'M142,40 L156,40 Q148,110 144,180 Q148,330 160,470 L148,470 Q134,330 130,180 Q134,110 142,40 Z', tone: -0.14 },
+  { d: 'M358,40 L344,40 Q352,110 356,180 Q352,330 340,470 L352,470 Q366,330 370,180 Q366,110 358,40 Z', tone: -0.14 },
+];
+const TRACK_PANTS_FRONT: VectorArt = { ...JOGGER_FRONT_ART, panels: [{ d: JOGGER_BODY }, ...TRACK_STRIPES] };
+const TRACK_PANTS_BACK: VectorArt = { ...JOGGER_BACK_ART, panels: [{ d: JOGGER_BODY }, ...TRACK_STRIPES] };
+
+const TRACKSUIT: GarmentDef = {
+  id: 'tracksuit',
+  name: 'Tracksuit Set',
+  short: 'Tracksuit Set',
+  category: 'sets',
+  group: 'Tracksuits',
+  spec: '260 GSM poly tricot · full-zip track jacket with stand collar · track pants with side stripes and rib cuffs',
+  views: [
+    { id: 'front', label: 'Jacket', art: TRACK_JACKET_FRONT, zone: zone(282, 120, 80, 80, 4, 4, "Jacket: wearer's left chest, beside the zip") },
+    { id: 'back', label: 'Jacket Back', art: TRACK_JACKET_BACK, zone: zone(130, 110, 240, 280, 12, 14, 'Jacket: center back, ~3 in below collar seam') },
+    LONG_SLEEVE_VIEW,
+    { id: 'left-leg', label: 'Left Leg', art: TRACK_PANTS_FRONT, zone: zone(286, 236, 63, 220, 4, 14, "Pants: front of wearer's left leg, ~2 in below crotch") },
+    { id: 'right-leg', label: 'Right Leg', art: TRACK_PANTS_FRONT, zone: zone(151, 236, 63, 220, 4, 14, "Pants: front of wearer's right leg, ~2 in below crotch") },
+    { id: 'pants-back', label: 'Pants Back', art: TRACK_PANTS_BACK, zone: zone(158, 256, 64, 128, 4, 8, "Pants: back of wearer's left thigh, below the jacket hem") },
+  ],
+  sizeChart: {
+    points: [
+      ['A', 'Jacket chest width', '1" below armhole, side to side', 23, 1, 0.5, 'chest'],
+      ['B', 'Jacket body length', 'From HPS to bottom of hem band', 27, 0.75, 0.5, 'length'],
+      ['C', 'Jacket shoulder width', 'Seam to seam', 19.5, 0.75, 0.375, 'shoulder'],
+      ['D', 'Sleeve length', 'Shoulder seam to cuff edge', 25, 0.5, 0.375, 'sleeve'],
+      ['E', 'Cuff width (relaxed)', 'Straight across cuff', 3.75, 0.125, 0.125, 'cuff'],
+      ['F', 'Hem band width (relaxed)', 'Straight across hem band', 19, 1, 0.5, 'waist'],
+      ['G', 'Collar height', 'Neck seam to collar edge, at centre back', 2.25, 0, 0.125],
+      ['H', 'Zipper length', 'Collar edge to hem, along zip', 25, 0.5, 0.25],
+      ['I', 'Pants waist (relaxed)', 'Across top of waistband, relaxed', 14, 1, 0.5],
+      ['J', 'Pants hip', '7" below waist seam, across', 21.5, 1, 0.5],
+      ['K', 'Front rise', 'Waist seam to crotch seam, front', 11.5, 0.25, 0.25],
+      ['L', 'Inseam', 'Crotch seam to cuff edge', 30, 0.25, 0.5],
+      ['M', 'Thigh', '1" below crotch, across leg', 12, 0.5, 0.25],
+      ['N', 'Leg opening', 'Across cuff, relaxed', 4.25, 0.125, 0.125],
+    ],
+  },
+  measureLines: {
+    chest: { x1: 105, y1: 256, x2: 396, y2: 256 },
+    length: { x1: 160, y1: 70, x2: 160, y2: 520 },
+    shoulder: { x1: 108, y1: 66, x2: 392, y2: 66 },
+    sleeve: { x1: 392, y1: 78, x2: 442, y2: 484 },
+    cuff: { x1: 416, y1: 464, x2: 468, y2: 460 },
+    waist: { x1: 102, y1: 532, x2: 398, y2: 532 },
+  },
+};
+
 /* ------------------------------------------------------------------------- shared helpers */
 
 /** Mirrors artwork left ↔ right (x → 500 − x). Paths must use absolute "x,y" coordinates only. */
@@ -1881,6 +1966,7 @@ export const BUILT_IN_GARMENTS: GarmentDef[] = [
   JOGGERS, SHORTS, CARGO,
   COACH, WORK,
   SOCCER_JERSEY, GK_JERSEY, TRAINING_TOP, SOCCER_SHORTS, SOCKS, BASE_LAYER, COMP_SHORTS,
+  TRACKSUIT,
   BACKPACK, DUFFEL, BELTBAG, TOTE, DRAWSTRING,
   LOWTOP, HIGHTOP, SLIDES,
   DADHAT, SNAPBACK, BUCKET, BEANIE,
@@ -1932,7 +2018,8 @@ export const zonePpi = (z: PrintZone): number => z.w / z.widthIn;
 
 /** Body shape, for code that needs to know whether a garment is worn on the torso or the legs. */
 export type GarmentShape = 'top' | 'bottom' | 'other';
-const SHAPE_OVERRIDE: Record<string, GarmentShape> = { 'soccer-shorts': 'bottom', 'compression-shorts': 'bottom', 'soccer-socks': 'other' };
+// A tracksuit set reads as a top: its first views (and the neck label) belong to the jacket.
+const SHAPE_OVERRIDE: Record<string, GarmentShape> = { 'soccer-shorts': 'bottom', 'compression-shorts': 'bottom', 'soccer-socks': 'other', tracksuit: 'top' };
 export function garmentShape(id: GarmentId): GarmentShape {
   const o = SHAPE_OVERRIDE[id];
   if (o) return o;

@@ -2,7 +2,7 @@
 export type GarmentId = string;
 /** Per-garment view id ('front', 'back', 'sleeve', 'left-leg', …). Each garment declares its own views. */
 export type ViewId = string;
-export type GarmentCategory = 'tops' | 'bottoms' | 'outerwear' | 'soccer' | 'bags' | 'footwear' | 'accessories' | 'custom';
+export type GarmentCategory = 'tops' | 'bottoms' | 'outerwear' | 'soccer' | 'sets' | 'bags' | 'footwear' | 'accessories' | 'custom';
 export type PrintEffect = 'none' | 'screen' | 'puff' | 'vintage';
 
 /** Serialized Fabric.js canvas (canvas.toObject()). */

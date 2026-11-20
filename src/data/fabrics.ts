@@ -169,6 +169,17 @@ export const FABRICS: FabricDef[] = [
     look: { weave: 'performance', tileIn: 0.3, roughness: 0.62, sheen: 0.3, sheenRoughness: 0.35, normalStrength: 0.45, mottle: 0.01, clearcoat: 0.06 },
   },
   {
+    id: 'tricot',
+    name: 'Poly tricot',
+    short: 'Tricot',
+    gsm: 260,
+    composition: '100% polyester warp-knit tricot, brushed back',
+    fiber: 'polyester',
+    care: 'Machine wash cold inside out · do not tumble dry · do not iron prints · no fabric softener',
+    description: 'Smooth warp knit with a soft sheen and brushed back: classic tracksuits.',
+    look: { weave: 'jersey', tileIn: 0.2, roughness: 0.5, sheen: 0.4, sheenRoughness: 0.3, normalStrength: 0.18, mottle: 0.004, clearcoat: 0.1 },
+  },
+  {
     id: 'compression',
     name: 'Compression knit',
     short: 'Compression',
@@ -279,6 +290,7 @@ const GARMENT_DEFAULT: Record<string, string> = {
   'soccer-socks': 'rib',
   'base-layer': 'compression',
   'compression-shorts': 'compression',
+  tracksuit: 'tricot',
   backpack: 'poly600d',
   duffel: 'poly600d',
   beltbag: 'nylon',
@@ -296,6 +308,7 @@ const SUGGEST: Record<string, string[]> = {
   bottoms: ['fleece', 'terry', 'twill', 'denim', 'performance', 'mesh'],
   outerwear: ['nylon', 'canvas', 'denim', 'fleece', 'twill'],
   soccer: ['performance', 'mesh', 'pique', 'jersey', 'compression'],
+  sets: ['tricot', 'fleece', 'terry', 'nylon', 'performance'],
   bags: ['poly600d', 'canvas', 'nylon', 'leather', 'denim'],
   footwear: ['leather', 'suede', 'canvas', 'engineered-knit'],
   accessories: ['twill', 'canvas', 'denim', 'nylon', 'rib'],
@@ -323,7 +336,7 @@ export function defaultFabricFor(garment: GarmentId): FabricDef {
   const id = GARMENT_DEFAULT[garment];
   if (id) return BY_ID.get(id)!;
   const cat = getGarment(garment).category;
-  const byCategory: Partial<Record<string, string>> = { outerwear: 'nylon', accessories: 'twill', soccer: 'performance', bags: 'poly600d', footwear: 'leather' };
+  const byCategory: Partial<Record<string, string>> = { outerwear: 'nylon', accessories: 'twill', soccer: 'performance', sets: 'tricot', bags: 'poly600d', footwear: 'leather' };
   return BY_ID.get(byCategory[cat] ?? 'jersey')!;
 }
 

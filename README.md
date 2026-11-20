@@ -29,6 +29,7 @@ The key is read by a small proxy inside the Vite dev/preview server (`server/cla
   - Footwear: Low-Top and High-Top Sneakers (outside, inside, tongue and heel print areas, US shoe-size grading), Slides (strap and footbed)
   - Headwear: Dad Hat, Snapback Cap, Bucket Hat, Beanie
   - Soccer: Soccer Jersey (V-neck, mesh side panels), Goalkeeper Jersey (padded elbows), Training Quarter-Zip, Soccer Shorts, Soccer Socks, plus an Underlayer group: a compression Base Layer Top and Compression Shorts (sliding shorts) in a new Compression knit fabric. Each has print zones for crests, sponsors, back name and number, sleeve badges and shorts numbers, plus a kit-specific manufacturing profile.
+  - Sets: Tracksuit Set, a full-zip track jacket (stand collar, rib cuffs and hem) with matching track pants (side stripes, rib cuffs), in a new Poly tricot fabric. Its views cover both pieces (Jacket, Jacket Back, Sleeve, Left Leg, Right Leg, Pants Back), its size chart grades jacket and pants measurements together, and the 3D model dresses the mannequin in both.
 
   Each garment has its own views (for example Front / Back / Left Leg / Right Leg, or Crown) and print areas sized in inches, and the UI and tech pack follow them.
 - **Photoshop import**: open a `.psd` from **Graphics → Import Photoshop project** (or drop it on the upload box).

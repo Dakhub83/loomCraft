@@ -117,6 +117,16 @@ const PROFILES: Record<string, FabricProfile> = {
     construction: ['Regular fit, long set-in sleeves', 'Crew neck with rib trim', 'Bonded foam pads at elbows', 'Flatlock seams; sublimated body recommended'],
     trims: ['Heat-applied crest', 'Name & number in heat-transfer vinyl', 'Tagless heat-transfer label'],
   },
+  tracksuit: {
+    gsm: 260, composition: '100% polyester warp-knit tricot, brushed back', fiber: 'polyester', care: 'Machine wash cold inside out · do not tumble dry · do not iron prints · no fabric softener',
+    construction: [
+      'Jacket: full-length #5 zip with 2.25″ stand collar, set-in sleeves, zipped or welt side pockets, 2″ rib cuffs and hem band',
+      'Pants: 1.5″ elastic waistband with internal drawcord, side-seam pockets, tapered leg with 3″ rib cuffs',
+      'Contrast side stripe (tape or panel) down each pant leg; optional matching stripe on the sleeves',
+      'Jacket and pants cut from the same dye lot so the set matches',
+    ],
+    trims: ['#5 coil zip with branded puller', 'Flat drawcord with metal aglets', 'Contrast stripe tape, 1″', 'Woven neck label in jacket; waistband label in pants'],
+  },
   'training-top': {
     gsm: 180, composition: '92% polyester / 8% elastane brushed-back performance knit', fiber: 'polyester', care: 'Machine wash cold inside out · do not tumble dry · do not iron prints · no fabric softener',
     construction: ['Slim fit', 'Mock-neck stand collar, 8″ quarter-zip', 'Flatlock seams', 'Optional thumbholes at cuffs'],

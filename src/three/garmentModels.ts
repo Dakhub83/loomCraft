@@ -503,6 +503,8 @@ interface BottomSpec {
   stripes?: boolean;
   /** Extra crotch depth in inches: slim legs sit apart, so the pelvis panel has to reach lower. */
   crotch?: number;
+  /** Back print on the back of the wearer's left thigh, this far below the crotch (a jacket covers the seat). */
+  backThighDrop?: number;
 }
 
 const BOTTOMS: Record<string, BottomSpec> = {
@@ -513,7 +515,16 @@ const BOTTOMS: Record<string, BottomSpec> = {
   cargo: { ease: 1.1, legEndY: 1.6, legR: [[-2, 4.5], [3, 4.3], [14, 3.7], [26, 3.45], [31.5, 3.5]], cuff: null, waistband: 'self', drawcord: false, cargo: true, fly: true, folds: 0.2 },
 };
 
-function buildBottom(garment: GarmentId, spec: BottomSpec, c: Ctx): Omit<GarmentModel, 'group' | 'materials' | 'frame'> {
+/**
+ * `ids` names the views whose zones sit on the pelvis front / back. A set (tracksuit) passes its own
+ * pant view ids, because its `front` and `back` views belong to the jacket. `null` = no such view.
+ */
+function buildBottom(
+  garment: GarmentId,
+  spec: BottomSpec,
+  c: Ctx,
+  ids: { front: ViewId | null; back: ViewId | null } = { front: 'front', back: 'back' },
+): Omit<GarmentModel, 'group' | 'materials' | 'frame'> {
   const WAIST_TOP = 41.8;
   const bandH = 1.9;
   const deep = spec.crotch ?? 0;
@@ -624,19 +635,19 @@ function buildBottom(garment: GarmentId, spec: BottomSpec, c: Ctx): Omit<Garment
 
   const anchors: GarmentModel['anchors'] = {};
   const top = WAIST_TOP - bandH;
-  if (hasView(garment, 'front')) {
-    const { h } = zoneSize(garment, 'front');
-    anchors.front = anchor(pelvisMesh, new THREE.Vector3(zoneCx(garment, 'front'), top - 1 - h / 2, 12), FRONT);
+  if (ids.front && hasView(garment, ids.front)) {
+    const { h } = zoneSize(garment, ids.front);
+    anchors[ids.front] = anchor(pelvisMesh, new THREE.Vector3(zoneCx(garment, ids.front), top - 1 - h / 2, 12), FRONT);
   }
-  if (hasView(garment, 'back')) {
-    const { h } = zoneSize(garment, 'back');
-    if (spec.cargo) {
+  if (ids.back && hasView(garment, ids.back)) {
+    const { h } = zoneSize(garment, ids.back);
+    if (spec.cargo || spec.backThighDrop != null) {
       // back of the wearer's left thigh
       const l = legs[1];
-      const y = BODY.CROTCH - 1 - h / 2;
+      const y = BODY.CROTCH - (spec.backThighDrop ?? 1) - h / 2;
       const p = l.at((l.top.y - y) / -l.dir.y);
-      anchors.back = anchor(legMeshes[1], new THREE.Vector3(p.x, y, -12), BACK);
-    } else anchors.back = anchor(pelvisMesh, new THREE.Vector3(0, top - 0.6 - h / 2, -12), BACK);
+      anchors[ids.back] = anchor(legMeshes[1], new THREE.Vector3(p.x, y, -12), BACK);
+    } else anchors[ids.back] = anchor(pelvisMesh, new THREE.Vector3(0, top - 0.6 - h / 2, -12), BACK);
   }
   for (const [view, side] of [['left-leg', 1], ['right-leg', -1]] as const) {
     if (!hasView(garment, view)) continue;
@@ -1374,7 +1385,30 @@ function buildBucket(garment: GarmentId, c: Ctx): Built {
  * ============================================================================================== */
 
 /** Builders for everything that isn't a parametric top or bottom. */
+/* ================================================================================================
+ * SETS
+ * ============================================================================================== */
+
+// Tracksuit = track jacket (top builder) over track pants (bottom builder) on one mannequin. The jacket
+// is roomier than the pants' pelvis, so its hem hangs over the waistband without the two touching.
+const TRACK_JACKET: TopSpec = {
+  ease: 2.4, hemY: 31, fit: 0.3, flare: 0, drop: 0.4, neck: 'mock', frontDrop: 1.0, backDrop: 0.4, neckW: 3.1,
+  sleeve: { kind: 'long', cuff: 1.75, fullness: 1.0 }, armAngle: 16, hemBand: 2.0, folds: 0.2, front: 'zip', pocket: 'split',
+  zoneTop: { front: 4.6, back: 4 },
+};
+const TRACK_PANTS: BottomSpec = {
+  ease: 1.3, legEndY: 4.4, legR: [[-2, 4.6], [3, 4.4], [14, 3.6], [22, 3.1], [26.5, 2.85], [28.8, 2.2]], cuff: 1.95,
+  waistband: 'rib', drawcord: false, cargo: false, fly: false, folds: 0.2, stripes: true, backThighDrop: 2.5, crotch: 0.8,
+};
+
+function buildTracksuit(garment: GarmentId, c: Ctx): Built {
+  const pants = buildBottom(garment, TRACK_PANTS, c, { front: null, back: 'pants-back' });
+  const jacket = buildTop(garment, TRACK_JACKET, c);
+  return { ...jacket, anchors: { ...pants.anchors, ...jacket.anchors }, trims: [...pants.trims, ...jacket.trims] };
+}
+
 const BUILDERS: Record<string, (garment: GarmentId, c: Ctx) => Omit<GarmentModel, 'group' | 'materials' | 'frame'>> = {
+  tracksuit: buildTracksuit,
   dadhat: (g, c) => buildCap(g, c, CAPS.dad),
   snapback: (g, c) => buildCap(g, c, CAPS.snap),
   'bucket-hat': buildBucket,
