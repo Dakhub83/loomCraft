@@ -1,5 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CheckCircle2, Loader2, Maximize2, Minus, PersonStanding, Plus, Rotate3d, XCircle } from 'lucide-react';
+import { CheckCircle2, Columns2, Loader2, Maximize2, Minus, PersonStanding, Plus, Rotate3d, XCircle } from 'lucide-react';
 import { Header, LoomCraftLogo } from './components/Header';
 import { Toolbar } from './components/Toolbar';
 import { LayersPanel, PropertiesPanel } from './components/LayersPanel';
@@ -98,6 +98,23 @@ function Studio({ initial, initialCustoms }: { initial: Workspace | null; initia
   const [psdFile, setPsdFile] = useState<File | null>(null);
   const closePsd = useCallback(() => setPsdFile(null), []);
   const close360 = useCallback(() => setShow360(false), []);
+  // split view: live 3D beside the 2D editor; remembered per browser
+  const [split, setSplitState] = useState(() => {
+    try {
+      return localStorage.getItem('loomcraft.splitView') === '1';
+    } catch {
+      return false;
+    }
+  });
+  const setSplit = useCallback((on: boolean) => {
+    setSplitState(on);
+    try {
+      localStorage.setItem('loomcraft.splitView', on ? '1' : '0');
+    } catch {
+      /* storage blocked: the choice just isn't remembered */
+    }
+  }, []);
+  const closeSplit = useCallback(() => setSplit(false), [setSplit]);
 
   const [layers, setLayers] = useState<LayerInfo[]>([]);
   const [selection, setSelection] = useState<SelectionInfo | null>(null);
@@ -554,7 +571,8 @@ function Studio({ initial, initialCustoms }: { initial: Workspace | null; initia
 
         {/* ---------------- stage ---------------- */}
         <main className="relative flex min-w-0 flex-1 flex-col">
-          <div ref={stageRef} className="lc-stage relative flex flex-1 items-center justify-center overflow-hidden">
+          <div className="flex min-h-0 flex-1">
+          <div ref={stageRef} className="lc-stage relative flex min-w-0 flex-1 items-center justify-center overflow-hidden">
             <div style={{ width: GARMENT_W * scale, height: GARMENT_H * scale }} className="relative shrink-0">
               <div
                 className="absolute left-0 top-0 origin-top-left will-change-transform"
@@ -604,8 +622,19 @@ function Studio({ initial, initialCustoms }: { initial: Workspace | null; initia
                   <PersonStanding size={14} /> Mannequin
                 </button>
                 <button
+                  onClick={() => setSplit(!split)}
+                  aria-pressed={split}
+                  className={`lc-btn h-8 gap-1.5 bg-[#111114]/90 px-3 text-xs backdrop-blur ${
+                    split ? 'border-violet-500/60 text-violet-200' : 'text-zinc-300 hover:text-zinc-100'
+                  }`}
+                  title={split ? 'Close the live 3D pane' : 'Show the garment in live 3D beside the editor'}
+                >
+                  <Columns2 size={14} /> Split view
+                </button>
+                <button
                   onClick={() => {
                     canvasRef.current?.selectLayers([]);
+                    setSplit(false);
                     setShow360(true);
                   }}
                   className="lc-btn h-8 gap-1.5 border-violet-500/40 bg-[#111114]/90 px-3 text-xs text-violet-200 backdrop-blur hover:border-violet-400"
@@ -651,6 +680,35 @@ function Studio({ initial, initialCustoms }: { initial: Workspace | null; initia
                 />
               </Suspense>
             )}
+          </div>
+
+          {split && !show360 && (
+            <aside className="relative w-[46%] min-w-[340px] max-w-[760px] shrink-0 border-l border-white/[0.06]" aria-label="Live 3D pane">
+              <Suspense
+                fallback={
+                  <div className="lc-stage grid h-full place-items-center text-xs text-zinc-400">
+                    <span className="flex items-center gap-2">
+                      <Loader2 size={14} className="animate-spin text-violet-400" /> Loading 3D viewer…
+                    </span>
+                  </div>
+                }
+              >
+                <Garment360
+                  docked
+                  followView={view}
+                  name={name}
+                  garment={garment}
+                  color={color}
+                  designs={designs}
+                  effects={effects}
+                  fabricId={fabrics[garment]}
+                  onFabric={changeFabric}
+                  onClose={closeSplit}
+                  onError={onError}
+                />
+              </Suspense>
+            </aside>
+          )}
           </div>
 
           {/* status bar */}

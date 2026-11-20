@@ -5,7 +5,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import { Box, Camera, Check, ChevronUp, Film, Layers, Loader2, Pause, Play, PersonStanding, RotateCcw, Scissors, X } from 'lucide-react';
 import { getGarment, viewLabel } from '../data/garments';
 import { FABRICS, defaultFabricFor, fabricFor } from '../data/fabrics';
-import type { GarmentId, ViewDesigns, ViewEffects } from '../types';
+import type { GarmentId, ViewDesigns, ViewEffects, ViewId } from '../types';
 import { buildFlatLay, type Built } from '../three/flatLay';
 import { buildModelScene, type ModelBuilt } from '../three/modelScene';
 import { hasGarmentModel } from '../three/garmentModels';
@@ -33,6 +33,22 @@ interface Props {
   onFabric(id: string | null): void;
   onClose(): void;
   onError(msg: string): void;
+  /**
+   * Split view: the viewer sits in a pane beside the 2D editor instead of covering it. It starts
+   * still (no auto-spin), leaves Space and Esc to the editor, and turns to face `followView`.
+   */
+  docked?: boolean;
+  /** The view being edited; when docked, the camera turns to show it. */
+  followView?: ViewId;
+}
+
+/** Which camera preset shows a view's print zone (views without an obvious side are left alone). */
+function presetForView(view: ViewId | undefined): string | null {
+  if (!view) return null;
+  if (view === 'front' || view === 'left-leg' || view === 'right-leg') return 'front';
+  if (view === 'back' || view === 'pants-back') return 'back';
+  if (view === 'sleeve' || view === 'side') return 'side';
+  return null;
 }
 
 type Mode = 'model' | 'flat';
@@ -59,7 +75,7 @@ function fitDistance(size: THREE.Vector3, camera: THREE.PerspectiveCamera) {
   return Math.max(size.y / 2 / Math.tan(vFov / 2), Math.max(size.x, size.z) / 2 / Math.tan(hFov / 2)) * 1.3 + size.z / 2;
 }
 
-export default function Garment360({ name, garment, color, designs, effects, fabricId, onFabric, onClose, onError }: Props) {
+export default function Garment360({ name, garment, color, designs, effects, fabricId, onFabric, onClose, onError, docked = false, followView }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
   const three = useRef<{
     renderer: THREE.WebGLRenderer;
@@ -81,7 +97,7 @@ export default function Garment360({ name, garment, color, designs, effects, fab
   const [mode, setMode] = useState<Mode>(canModel ? 'model' : 'flat');
   const effectiveMode: Mode = canModel ? mode : 'flat';
   const [loading, setLoading] = useState(true);
-  const [spin, setSpin] = useState(true);
+  const [spin, setSpin] = useState(!docked);
   const [cut, setCut] = useState(0);
   const [angle, setAngle] = useState(0);
   const [showMannequin, setShowMannequin] = useState(true);
@@ -97,6 +113,8 @@ export default function Garment360({ name, garment, color, designs, effects, fab
   const spinAbort = useRef<AbortController | null>(null);
   const cutRef = useRef(cut);
   cutRef.current = cut;
+  const followViewRef = useRef(followView);
+  followViewRef.current = followView;
   const mannequinRef = useRef(showMannequin);
   mannequinRef.current = showMannequin;
 
@@ -240,7 +258,9 @@ export default function Garment360({ name, garment, color, designs, effects, fab
   /* ---------- (re)build when the design, fabric or mode changes ---------- */
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
+    // edits to the artwork swap the model in place; only a new garment or mode shows the loading veil
+    const reshaping = !three.current?.built || three.current.builtKey !== `${garment}|${effectiveMode}`;
+    if (reshaping) setLoading(true);
     const timer = setTimeout(async () => {
       try {
         const tools = await import('../utils/exportTools');
@@ -283,7 +303,10 @@ export default function Garment360({ name, garment, color, designs, effects, fab
           st.controls.target.copy(center);
           st.controls.minDistance = dist * 0.35;
           st.controls.maxDistance = dist * 2.4;
-          st.camera.position.copy(center).add(new THREE.Vector3(0, dist * 0.08, dist));
+          const p = PRESETS.find((x) => x.id === presetForView(followViewRef.current)) ?? PRESETS[0];
+          const start = docked ? new THREE.Vector3().setFromSphericalCoords(dist, Math.PI / 2 - 0.08, p.azimuth) : new THREE.Vector3(0, dist * 0.08, dist);
+          st.camera.position.copy(center).add(start);
+          st.tween = null; // a turn started before this framing would drag the camera back to its old distance
           st.controls.update();
         }
       } catch (e) {
@@ -305,6 +328,14 @@ export default function Garment360({ name, garment, color, designs, effects, fab
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       if (t.closest('input, textarea, select, [role="dialog"]')) return;
+      if (docked) {
+        // the editor owns the keyboard; Esc only closes this pane's own popovers
+        if (e.key === 'Escape' && !spinJob.running) {
+          if (mockOpen) setMockOpen(false);
+          else if (fabricOpen) setFabricOpen(false);
+        }
+        return;
+      }
       if (e.key === 'Escape') {
         if (spinJob.running) return;
         if (mockOpen) setMockOpen(false);
@@ -317,7 +348,7 @@ export default function Garment360({ name, garment, color, designs, effects, fab
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose, fabricOpen, mockOpen, spinJob.running]);
+  }, [onClose, fabricOpen, mockOpen, spinJob.running, docked]);
 
   const goTo = useCallback((p: (typeof PRESETS)[number], dist?: number) => {
     const st = three.current;
@@ -330,6 +361,17 @@ export default function Garment360({ name, garment, color, designs, effects, fab
     const to = new THREE.Vector3().setFromSphericalCoords(r, polar, p.azimuth);
     st.tween = { from, to, t: 0 };
   }, []);
+
+  /* ---------- split view: face the view being edited ---------- */
+  useEffect(() => {
+    // before the first build the framing itself faces followView (see the rebuild effect)
+    if (!docked || capturing.current || !three.current?.fit) return;
+    const p = PRESETS.find((x) => x.id === presetForView(followView));
+    if (p && !p.cut) {
+      setCut(0);
+      goTo(p);
+    }
+  }, [docked, followView, goTo]);
 
   /* ---------- 360° mockup export ---------- */
   const frameSource = (): FrameSource | null => {
@@ -435,16 +477,31 @@ export default function Garment360({ name, garment, color, designs, effects, fab
   };
 
   return (
-    <div className="lc-stage absolute inset-0 z-20 flex flex-col" role="region" aria-label="360 degree garment preview">
+    <div
+      className={`lc-stage flex flex-col ${docked ? 'relative h-full w-full' : 'absolute inset-0 z-20'}`}
+      role="region"
+      aria-label={docked ? 'Live 3D preview' : '360 degree garment preview'}
+    >
       <div ref={hostRef} className="relative min-h-0 flex-1 overflow-hidden" />
 
       {/* top bar */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-3 p-3">
+      <div className="pointer-events-none absolute inset-x-0 top-0 flex flex-wrap items-start justify-between gap-2 p-3">
         <div className="pointer-events-auto rounded-lg border border-white/10 bg-black/45 px-3 py-2 backdrop-blur">
-          <div className="text-xs font-semibold text-zinc-100">
-            360° Preview · {getGarment(garment).name} <span className="font-normal text-zinc-400">· {fabric.name}</span>
-          </div>
-          <div className="text-[10.5px] text-zinc-400">Drag to rotate · scroll to zoom · Space to spin · Esc to close</div>
+          {docked ? (
+            <>
+              <div className="text-xs font-semibold text-zinc-100">
+                Live 3D <span className="font-normal text-zinc-400">· {fabric.short}</span>
+              </div>
+              <div className="text-[10.5px] text-zinc-400">Updates as you edit · drag to rotate</div>
+            </>
+          ) : (
+            <>
+              <div className="text-xs font-semibold text-zinc-100">
+                360° Preview · {getGarment(garment).name} <span className="font-normal text-zinc-400">· {fabric.name}</span>
+              </div>
+              <div className="text-[10.5px] text-zinc-400">Drag to rotate · scroll to zoom · Space to spin · Esc to close</div>
+            </>
+          )}
           {missing.length > 0 && <div className="mt-1 text-[10.5px] text-amber-300/90">Not shown on the 3D model: {missing.join(', ')} (use Flat-lay)</div>}
         </div>
         <div className="pointer-events-auto flex items-center gap-1.5">
@@ -471,20 +528,23 @@ export default function Garment360({ name, garment, color, designs, effects, fab
               </button>
             ))}
           </div>
-          <span className="rounded-md border border-white/10 bg-black/45 px-2 py-1 font-mono text-[11px] tabular-nums text-violet-300 backdrop-blur">{angle}°</span>
-          <button onClick={snapshot} className="lc-btn h-8 gap-1.5 px-2.5 text-xs" title="Download this angle as PNG">
-            <Camera size={14} /> Snapshot
+          {!docked && (
+            <span className="rounded-md border border-white/10 bg-black/45 px-2 py-1 font-mono text-[11px] tabular-nums text-violet-300 backdrop-blur">{angle}°</span>
+          )}
+          <button onClick={snapshot} className={`lc-btn h-8 gap-1.5 text-xs ${docked ? 'w-8 p-0' : 'px-2.5'}`} title="Download this angle as PNG" aria-label="Snapshot">
+            <Camera size={14} /> {!docked && 'Snapshot'}
           </button>
           <button
             onClick={() => setMockOpen((o) => !o)}
             disabled={loading && !spinJob.running}
             aria-expanded={mockOpen}
-            className={`lc-btn h-8 gap-1.5 px-2.5 text-xs disabled:opacity-50 ${mockOpen ? 'border-violet-500/60 text-violet-200' : ''}`}
+            aria-label="360° Mockup"
+            className={`lc-btn h-8 gap-1.5 text-xs disabled:opacity-50 ${docked ? 'w-8 p-0' : 'px-2.5'} ${mockOpen ? 'border-violet-500/60 text-violet-200' : ''}`}
             title="Export a spinning 360° mockup: video, GIF, web spin or frames"
           >
-            <Film size={14} /> 360° Mockup
+            <Film size={14} /> {!docked && '360° Mockup'}
           </button>
-          <button onClick={onClose} className="lc-btn h-8 w-8 p-0" title="Close 360° preview (Esc)">
+          <button onClick={onClose} className="lc-btn h-8 w-8 p-0" title={docked ? 'Close split view' : 'Close 360° preview (Esc)'} aria-label={docked ? 'Close split view' : 'Close 360° preview'}>
             <X size={15} />
           </button>
         </div>
@@ -557,12 +617,24 @@ export default function Garment360({ name, garment, color, designs, effects, fab
       {/* bottom controls */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center p-3">
         <div className="pointer-events-auto flex flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-[#111114]/90 px-3 py-2 shadow-2xl backdrop-blur">
-          <button onClick={() => setSpin((s) => !s)} className={`lc-btn h-8 gap-1.5 px-2.5 text-xs ${spin ? 'text-violet-300' : ''}`} title="Auto-rotate (Space)">
-            {spin ? <Pause size={13} /> : <Play size={13} />} {spin ? 'Spinning' : 'Spin'}
+          <button
+            onClick={() => setSpin((s) => !s)}
+            className={`lc-btn h-8 gap-1.5 text-xs ${docked ? 'w-8 p-0' : 'px-2.5'} ${spin ? 'text-violet-300' : ''}`}
+            title={docked ? 'Auto-rotate' : 'Auto-rotate (Space)'}
+            aria-label={spin ? 'Stop spinning' : 'Spin'}
+          >
+            {spin ? <Pause size={13} /> : <Play size={13} />} {!docked && (spin ? 'Spinning' : 'Spin')}
           </button>
           <div className="flex gap-1 rounded-lg bg-black/30 p-1">
             {PRESETS.map((p) => (
-              <button key={p.id} onClick={() => goTo(p)} className="rounded-md px-2.5 py-1 text-[11px] font-medium text-zinc-300 transition hover:bg-zinc-700/70 hover:text-white">
+              <button
+                key={p.id}
+                onClick={() => {
+                  // the docked pane has no Interior slider, so the other angles undo the Inside cutaway
+                  if (docked && p.cut == null) setCut(0);
+                  goTo(p);
+                }}
+                className="rounded-md px-2.5 py-1 text-[11px] font-medium text-zinc-300 transition hover:bg-zinc-700/70 hover:text-white">
                 {p.label}
               </button>
             ))}
@@ -587,12 +659,14 @@ export default function Garment360({ name, garment, color, designs, effects, fab
               <PersonStanding size={14} />
             </button>
           )}
-          <label className="flex items-center gap-2 pl-1 text-[11px] text-zinc-400" title="Cut away the half facing you to see the inside of the garment">
-            <Scissors size={13} className={cut > 0 ? 'text-violet-400' : ''} />
-            Interior
-            <input type="range" min={0} max={1} step={0.01} value={cut} onChange={(e) => setCut(+e.target.value)} className="lc-range w-28" />
-            <span className="w-8 font-mono text-zinc-300">{Math.round(cut * 100)}%</span>
-          </label>
+          {!docked && (
+            <label className="flex items-center gap-2 pl-1 text-[11px] text-zinc-400" title="Cut away the half facing you to see the inside of the garment">
+              <Scissors size={13} className={cut > 0 ? 'text-violet-400' : ''} />
+              Interior
+              <input type="range" min={0} max={1} step={0.01} value={cut} onChange={(e) => setCut(+e.target.value)} className="lc-range w-28" />
+              <span className="w-8 font-mono text-zinc-300">{Math.round(cut * 100)}%</span>
+            </label>
+          )}
           <button onClick={reset} className="lc-btn h-8 w-8 p-0" title="Reset view">
             <RotateCcw size={13} />
           </button>
